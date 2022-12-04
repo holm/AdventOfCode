@@ -102,7 +102,7 @@ function part1(strategies: Strategy[]): number | undefined {
   return max(results);
 }
 
-function part2(strategies: Strategy[]) {
+function part2(strategies: Strategy[]): number {
   return sumBy(strategies, (strategy) => {
     const otherSign = inputMapping[strategy.input];
     const result = outputToResultMapping[strategy.output];

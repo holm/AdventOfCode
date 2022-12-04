@@ -54,7 +54,7 @@ function part1(packs: Pack[]): number {
   });
 }
 
-function part2(packs: Pack[]) {
+function part2(packs: Pack[]): number {
   const groups = chunk(packs, 3);
 
   return sumBy(groups, (group) => {
