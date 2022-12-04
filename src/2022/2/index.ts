@@ -1,14 +1,5 @@
 import fs from "fs/promises";
-import {
-  identity,
-  invert,
-  last,
-  max,
-  result,
-  sortBy,
-  sum,
-  sumBy,
-} from "lodash";
+import { identity, invert, max, sumBy } from "lodash";
 import { join } from "path";
 import permutations from "just-permutations";
 
