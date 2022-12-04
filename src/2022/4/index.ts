@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { chunk, countBy, identity, range, sumBy } from "lodash";
+import { identity } from "lodash";
 import { join } from "path";
 
 type Range = [number, number];
@@ -24,8 +24,12 @@ function parseRange(rangeRaw: string): Range {
   return rangeRaw.split("-").map((value) => parseInt(value)) as Range;
 }
 
-function rangeIncludes(o: Range, i: Range): boolean {
-  return o[0] <= i[0] && o[1] >= i[1];
+function rangeIncludes(x: Range, y: Range): boolean {
+  return x[0] <= y[0] && x[1] >= y[1];
+}
+
+function rangeIncludesPartially(x: Range, y: Range): boolean {
+  return x[0] <= y[1] && y[0] <= x[1];
 }
 
 function part1(pairs: Pair[]): number {
@@ -34,7 +38,14 @@ function part1(pairs: Pair[]): number {
   }).length;
 }
 
-function part2(pairs: Pair[]) {}
+function part2(pairs: Pair[]): number {
+  return pairs.filter((pair) => {
+    return (
+      rangeIncludesPartially(pair[0], pair[1]) ||
+      rangeIncludesPartially(pair[1], pair[0])
+    );
+  }).length;
+}
 
 async function main() {
   const packs = await loadInput();
