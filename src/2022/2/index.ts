@@ -1,21 +1,42 @@
 import fs from "fs/promises";
-import { identity, last, sortBy, sum, sumBy } from "lodash";
+import {
+  identity,
+  invert,
+  last,
+  max,
+  result,
+  sortBy,
+  sum,
+  sumBy,
+} from "lodash";
 import { join } from "path";
 import permutations from "just-permutations";
 
 type Sign = "Rock" | "Paper" | "Scissor";
 type InputCode = "A" | "B" | "C";
 type OutputCode = "X" | "Y" | "Z";
+type Result = "W" | "L" | "D";
 
 type Strategy = {
   input: InputCode;
   output: OutputCode;
 };
 
-type InputMapping = Record<InputCode, Sign>;
-type OutputMapping = Record<OutputCode, Sign>;
+const resultScores: Record<Result, number> = {
+  W: 6,
+  D: 3,
+  L: 0,
+};
 
-const inputMapping: InputMapping = {
+type OutputToSignMapping = Record<OutputCode, Sign>;
+
+const outputToResultMapping: Record<OutputCode, Result> = {
+  X: "L",
+  Y: "D",
+  Z: "W",
+};
+
+const inputMapping: Record<InputCode, Sign> = {
   A: "Rock",
   B: "Paper",
   C: "Scissor",
@@ -32,6 +53,7 @@ const beats: Record<Sign, Sign> = {
   Scissor: "Paper",
   Paper: "Rock",
 };
+const looses = invert(beats) as Record<Sign, Sign>;
 
 async function loadInput(): Promise<Strategy[]> {
   const data = await fs.readFile(join(__dirname, "input.txt"), {
@@ -50,17 +72,17 @@ async function loadInput(): Promise<Strategy[]> {
   });
 }
 
-function getMatchScore(otherSign: Sign, mySign: Sign): number {
+function getMatchResult(otherSign: Sign, mySign: Sign): Result {
   if (otherSign === mySign) {
-    return 3; // Draw
+    return "D";
   } else if (beats[mySign] === otherSign) {
-    return 6; // Win
+    return "W";
   } else {
-    return 0; // Lost
+    return "L";
   }
 }
 
-function generateOutputMappings(): OutputMapping[] {
+function generateOutputToSignMappings(): OutputToSignMapping[] {
   return permutations(["Rock", "Paper", "Scissor"] as Sign[]).map((signs) => {
     return {
       X: signs[0],
@@ -70,16 +92,41 @@ function generateOutputMappings(): OutputMapping[] {
   });
 }
 
-function evaluateMapping(
-  strategies: Strategy[],
-  outputMapping: OutputMapping
-): number {
+function part1(strategies: Strategy[]): number | undefined {
+  const outputMappings = generateOutputToSignMappings();
+
+  const results = outputMappings.map((outputMapping) =>
+    sumBy(strategies, (strategy) => {
+      const otherSign = inputMapping[strategy.input];
+      const mySign = outputMapping[strategy.output];
+
+      const signScore = signScores[mySign];
+      const result = getMatchResult(otherSign, mySign);
+      const matchScore = resultScores[result];
+
+      return signScore + matchScore;
+    })
+  );
+
+  return max(results);
+}
+
+function part2(strategies: Strategy[]) {
   return sumBy(strategies, (strategy) => {
     const otherSign = inputMapping[strategy.input];
-    const mySign = outputMapping[strategy.output];
+    const result = outputToResultMapping[strategy.output];
+
+    let mySign: Sign;
+    if (result === "L") {
+      mySign = beats[otherSign];
+    } else if (result === "D") {
+      mySign = otherSign;
+    } else {
+      mySign = looses[otherSign];
+    }
 
     const signScore = signScores[mySign];
-    const matchScore = getMatchScore(otherSign, mySign);
+    const matchScore = resultScores[result];
 
     return signScore + matchScore;
   });
@@ -88,13 +135,8 @@ function evaluateMapping(
 async function main() {
   const strategies = await loadInput();
 
-  const outputMappings = generateOutputMappings();
-
-  for (const outputMapping of outputMappings) {
-    const result = evaluateMapping(strategies, outputMapping);
-
-    console.log(result);
-  }
+  console.log(part1(strategies));
+  console.log(part2(strategies));
 }
 
 main();
