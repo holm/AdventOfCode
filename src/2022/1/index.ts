@@ -3,7 +3,7 @@ import { identity, last, sortBy, sum } from "lodash";
 import { join } from "path";
 
 async function loadInput(): Promise<number[][]> {
-  const data = await fs.readFile(join(__dirname, "..", "1", "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
 
