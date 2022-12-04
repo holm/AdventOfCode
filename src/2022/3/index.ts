@@ -1,12 +1,13 @@
 import fs from "fs/promises";
-import { identity, sumBy } from "lodash";
+import { chunk, identity, sumBy } from "lodash";
 import { join } from "path";
 
 type Item = string;
 
 type Pack = {
-  left: Item[];
-  right: Item[];
+  left: Set<Item>;
+  right: Set<Item>;
+  all: Set<Item>;
 };
 
 async function loadInput(): Promise<Pack[]> {
@@ -22,8 +23,9 @@ async function loadInput(): Promise<Pack[]> {
     const total = allItems.length;
 
     return {
-      left: allItems.slice(0, total / 2),
-      right: allItems.slice(total / 2),
+      left: new Set(allItems.slice(0, total / 2)),
+      right: new Set(allItems.slice(total / 2)),
+      all: new Set(allItems),
     };
   });
 }
@@ -38,11 +40,30 @@ function getPriority(item: Item): number {
   }
 }
 
-function getPrioritySum(packs: Pack[]) {
+function intersection(a: Set<Item>, b: Set<Item>): Set<Item> {
+  return new Set(Array.from(a).filter((item) => b.has(item)));
+}
+
+function part1(packs: Pack[]): number {
   return sumBy(packs, (pack) => {
-    const duplicateItem = pack.left.find((item) =>
-      pack.right.includes(item)
-    ) as Item;
+    const duplicateItems = intersection(pack.left, pack.right);
+
+    const duplicateItem = duplicateItems.values().next().value;
+
+    return getPriority(duplicateItem);
+  });
+}
+
+function part2(packs: Pack[]) {
+  const groups = chunk(packs, 3);
+
+  return sumBy(groups, (group) => {
+    const duplicateItems = intersection(
+      intersection(group[0].all, group[1].all),
+      group[2].all
+    );
+
+    const duplicateItem = duplicateItems.values().next().value;
 
     return getPriority(duplicateItem);
   });
@@ -51,7 +72,8 @@ function getPrioritySum(packs: Pack[]) {
 async function main() {
   const packs = await loadInput();
 
-  console.log(getPrioritySum(packs));
+  console.log(part1(packs));
+  console.log(part2(packs));
 }
 
 main();
