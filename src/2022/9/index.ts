@@ -1,5 +1,6 @@
+import assert from "assert";
 import fs from "fs/promises";
-import { identity } from "lodash";
+import { first, identity, last, range } from "lodash";
 import { join } from "path";
 
 type Direction = "L" | "R" | "U" | "D";
@@ -10,7 +11,7 @@ type Move = {
 };
 
 async function loadInput(): Promise<Move[]> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "test2.txt"), {
     encoding: "utf-8",
   });
 
@@ -60,17 +61,34 @@ class Coordinate {
 }
 
 class Grid {
-  head: Coordinate = new Coordinate();
-  tail: Coordinate = new Coordinate();
+  knots: Coordinate[];
   tailVisits = new Set<string>();
 
-  constructor() {
+  constructor(knotCount: number) {
+    assert(knotCount > 0);
+    this.knots = range(0, knotCount).map(() => new Coordinate());
     this.tailVisits.add(this.tail.toString());
   }
 
-  catchupTail(): void {
-    const xDiff = this.head.x - this.tail.x;
-    const yDiff = this.head.y - this.tail.y;
+  get head(): Coordinate {
+    return first(this.knots) as Coordinate;
+  }
+
+  get tail(): Coordinate {
+    return last(this.knots) as Coordinate;
+  }
+
+  catchup(knotNo = 0): void {
+    const knot = this.knots[knotNo];
+    const nextKnot = this.knots[knotNo + 1];
+
+    if (nextKnot === undefined) {
+      this.tailVisits.add(knot.toString());
+      return;
+    }
+
+    const xDiff = knot.x - nextKnot.x;
+    const yDiff = knot.y - nextKnot.y;
 
     const move = new Coordinate(Math.sign(xDiff), Math.sign(yDiff));
 
@@ -78,9 +96,9 @@ class Grid {
       return;
     }
 
-    this.tail.move(move);
+    nextKnot.move(move);
 
-    this.tailVisits.add(this.tail.toString());
+    this.catchup(knotNo + 1);
   }
 
   move(move: Move): void {
@@ -89,13 +107,13 @@ class Grid {
     for (let s = 0; s < move.steps; s++) {
       this.head.move(stepMove);
 
-      this.catchupTail();
+      this.catchup();
     }
   }
 }
 
 function part1(moves: Move[]): number {
-  const grid = new Grid();
+  const grid = new Grid(2);
 
   for (const move of moves) {
     grid.move(move);
@@ -105,7 +123,13 @@ function part1(moves: Move[]): number {
 }
 
 function part2(moves: Move[]): number {
-  return 0;
+  const grid = new Grid(10);
+
+  for (const move of moves) {
+    grid.move(move);
+  }
+
+  return grid.tailVisits.size;
 }
 
 async function main() {
