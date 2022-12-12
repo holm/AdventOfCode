@@ -8,6 +8,7 @@ type Problem = {
   graph: Graph;
   start: string;
   end: string;
+  potentialStarts: string[];
 };
 
 function getHeight(grid: string[][], l: number, c: number): number {
@@ -33,6 +34,7 @@ async function loadInput(): Promise<Problem> {
 
   let start: string | null = null;
   let end: string | null = null;
+  const potentialStarts: string[] = [];
 
   const graph = new Graph();
 
@@ -51,6 +53,8 @@ async function loadInput(): Promise<Problem> {
         start = name;
       } else if (char === "E") {
         end = name;
+      } else if (char === "a") {
+        potentialStarts.push(name);
       }
 
       const height = getHeight(grid, l, c);
@@ -88,6 +92,7 @@ async function loadInput(): Promise<Problem> {
     graph,
     start,
     end,
+    potentialStarts,
   };
 }
 
@@ -100,7 +105,17 @@ function part1(problem: Problem): number {
 }
 
 function part2(problem: Problem): number {
-  return 0;
+  const lengths = problem.potentialStarts.map((start) => {
+    const path = problem.graph.path(start, problem.end);
+
+    if (Array.isArray(path)) {
+      return path.length - 1;
+    } else {
+      return 0;
+    }
+  });
+
+  return lengths.filter((l) => l !== 0).sort((a, b) => a - b)[0];
 }
 
 async function main() {
