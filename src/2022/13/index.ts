@@ -59,7 +59,10 @@ async function loadInput(): Promise<PacketPair[]> {
   });
 
   return data.split("\n\n").map((lines) => {
-    return lines.split("\n").map((line) => {
+    const pairLines = lines.split("\n");
+    assert(pairLines.length === 2);
+
+    return pairLines.map((line) => {
       return parseData(line);
     }) as PacketPair;
   });
