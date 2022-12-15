@@ -49,20 +49,6 @@ function calculateDistance(a: Coordinate, b: Coordinate): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-function scanRow(
-  sensors: Sensor[],
-  minX: number,
-  maxX: number,
-  y: number
-): boolean[] {
-  return range(minX, maxX + 1).map((x) => {
-    return sensors.some(
-      (sensor) =>
-        calculateDistance({ x, y }, sensor.location) <= sensor.distance
-    );
-  });
-}
-
 function part1(sensors: Sensor[], y: number): number {
   const xs = [
     ...sensors.map((sensor) => sensor.location.x),
