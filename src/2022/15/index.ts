@@ -1,6 +1,6 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { identity, max, min, range } from "lodash";
+import { identity, max, min, range, sortBy } from "lodash";
 import { join } from "path";
 
 type Coordinate = { x: number; y: number };
@@ -89,18 +89,40 @@ function part1(sensors: Sensor[], y: number): number {
     }
   }
 
-  const scanResult = scanRow(sensors, minX, maxX, y);
+  const excluded = range(minX, maxX + 1).filter((x) => {
+    return sensors.some(
+      (sensor) =>
+        calculateDistance({ x, y }, sensor.location) <= sensor.distance
+    );
+  });
 
-  return scanResult.filter(identity).length - occupied.size;
+  return excluded.length - occupied.size;
 }
 
 function part2(sensors: Sensor[], minXY: number, maxXY: number): number {
   for (let y = minXY; y <= maxXY; y++) {
-    const row = scanRow(sensors, minXY, maxXY, y);
+    const ranges: [number, number][] = [];
 
-    const x = row.indexOf(false);
-    if (x !== -1) {
-      return x * 4000000 + y;
+    for (const sensor of sensors) {
+      const yDiff = sensor.distance - Math.abs(y - sensor.location.y);
+      if (yDiff >= 0) {
+        ranges.push([sensor.location.x - yDiff, sensor.location.x + yDiff]);
+      }
+    }
+
+    let coverUntil = minXY - 1;
+
+    const sortedRanges = sortBy(ranges, ([s]) => s);
+    for (const [s, e] of sortedRanges) {
+      if (s > coverUntil + 1) {
+        break;
+      } else if (e > coverUntil) {
+        coverUntil = e;
+      }
+    }
+
+    if (coverUntil < maxXY) {
+      return (coverUntil + 1) * 4000000 + y;
     }
   }
 
@@ -111,7 +133,7 @@ async function main() {
   console.log(part1(await loadInput("test"), 10));
   console.log(part1(await loadInput(), 2000000));
   console.log(part2(await loadInput("test"), 0, 20));
-  //console.log(part2(await loadInput(), 0, 4000000));
+  console.log(part2(await loadInput(), 0, 4000000));
 }
 
 main();
