@@ -40,51 +40,68 @@ type Solution = {
 };
 
 function search(
-  valve: Valve,
-  minutesLeft: number,
   valves: Map<string, Valve>,
-  status: ValveStatus,
-  cache: Map<string, Solution>
+  positions: Valve[],
+  positionIdx = 0,
+  minutesLeft = 30,
+  status: ValveStatus = new Map(),
+  cache: Map<string, Solution> = new Map()
 ): Solution {
   if (minutesLeft === 1) {
     return {
       status,
       release: 0,
     };
+  } else if (positionIdx === positions.length) {
+    return search(valves, positions, 0, minutesLeft - 1, status, cache);
   }
 
-  const cacheKey = `${minutesLeft}-${valve.name}` + [...status.keys()].join("");
-  const cachedResult = cache.get(cacheKey);
-  if (cachedResult !== undefined) {
-    return cachedResult;
+  const cacheKey =
+    positionIdx === 0
+      ? `${minutesLeft}-${positions
+          .map((position) => position.name)
+          .join(":")}-${[...status.keys()].join("")}`
+      : undefined;
+  if (cacheKey !== undefined) {
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult !== undefined) {
+      return cachedResult;
+    }
   }
 
-  const solutions = valve.paths.map((nextValve) => {
+  const position = positions[positionIdx];
+
+  const solutions = position.paths.map((nextValve) => {
+    const updatedPositions = [...positions];
+    updatedPositions[positionIdx] = valves.get(nextValve) as Valve;
+
     return search(
-      valves.get(nextValve) as Valve,
-      minutesLeft - 1,
       valves,
+      updatedPositions,
+      positionIdx + 1,
+      minutesLeft,
       status,
       cache
     );
   });
 
-  const valveStatus = status.get(valve.name);
-  if (valveStatus === undefined && valve.rate > 0) {
+  const valveStatus = status.get(position.name);
+  if (valveStatus === undefined && position.rate > 0) {
     const updatedStatus = new Map(status.entries());
-    updatedStatus.set(valve.name, minutesLeft - 1);
+    updatedStatus.set(position.name, minutesLeft - 1);
 
     const solution = search(
-      valve,
-      minutesLeft - 1,
       valves,
+      positions,
+      positionIdx + 1,
+      minutesLeft,
       updatedStatus,
       cache
     );
 
     solutions.push({
       status: solution.status,
-      release: solution.release + (minutesLeft - 1) * valve.rate,
+      release: solution.release + (minutesLeft - 1) * position.rate,
     });
   }
 
@@ -97,11 +114,8 @@ function search(
     };
   }
 
-  try {
+  if (cacheKey !== undefined) {
     cache.set(cacheKey, bestSolution);
-  } catch (err) {
-    console.log(cacheKey, bestSolution);
-    throw err;
   }
 
   return bestSolution;
@@ -110,28 +124,28 @@ function search(
 function part1(valves: Valve[]): number {
   const valvesMap = new Map(valves.map((valve) => [valve.name, valve]));
 
-  const solution = search(
-    valvesMap.get("AA") as Valve,
-    30,
-    valvesMap,
-    new Map(),
-    new Map()
-  );
+  const startValve = valvesMap.get("AA") as Valve;
 
-  console.log(solution.status);
+  const solution = search(valvesMap, [startValve]);
 
   return solution.release;
 }
 
 function part2(valves: Valve[]): number {
-  return 0;
+  const valvesMap = new Map(valves.map((valve) => [valve.name, valve]));
+
+  const startValve = valvesMap.get("AA") as Valve;
+
+  const solution = search(valvesMap, [startValve, startValve], 0, 26);
+
+  return solution.release;
 }
 
 async function main() {
-  console.log(part1(await loadInput("test")));
-  console.log(part1(await loadInput()));
-  // console.log(part2(await loadInput("test")));
-  // console.log(part2(await loadInput()));
+  // console.log(part1(await loadInput("test")));
+  // console.log(part1(await loadInput()));
+  console.log(part2(await loadInput("test")));
+  console.log(part2(await loadInput()));
 }
 
 main();
