@@ -1,3 +1,4 @@
+import { assert } from "console";
 import fs from "fs/promises";
 import { range } from "lodash";
 import { join } from "path";
@@ -36,16 +37,10 @@ const ROCKS: Rock[] = [
 
 const WIDTH = 7;
 
-function printGrid(grid: Grid<string>): void {
-  const yMin = grid.yMin;
-  const yMax = grid.yMax;
-
-  const rowIndices = range(0, WIDTH);
-
-  for (let y = yMax; y >= yMin; y--) {
-    const line = rowIndices.map((x) => grid.get(x, y, ".")).join("");
-    console.log(line);
-  }
+function renderRow(grid: Grid<string>, y: number): string {
+  return range(0, WIDTH)
+    .map((x) => grid.get(x, y, "."))
+    .join("");
 }
 
 function willHit(
@@ -72,30 +67,37 @@ function willHit(
 }
 
 function solve(winds: Direction[], noRocks: number): number {
-  let grid = new Grid<string>();
+  const grid = new Grid<string>();
   for (let x = 0; x < WIDTH; x++) {
     grid.set(x, 0, "-");
   }
 
-  let floor = 0;
+  let yMax = 0;
+
+  let ySkipped = 0;
+  let firstResetWind = -1;
+  let firstResetY = -1;
+  let firstResetRock = -1;
 
   let windIdx = 0;
-  for (let i = 0; i < noRocks; i++) {
-    const rock = ROCKS[i % ROCKS.length];
+  for (let rockIdx = 0; rockIdx < noRocks; rockIdx++) {
+    const rock = ROCKS[rockIdx % ROCKS.length];
 
-    let [x, y] = [2, grid.yMax + 4];
+    let x = 2;
+    let y = yMax + 4;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      // Blow wind
       const wind = winds[windIdx % winds.length];
       windIdx++;
 
+      // Blow wind
       const dx = wind === "<" ? -1 : 1;
       if (!willHit(grid, rock, x + dx, y)) {
         x += dx;
       }
 
+      // Move down
       const dy = -1;
       if (!willHit(grid, rock, x, y + dy)) {
         y += dy;
@@ -112,27 +114,31 @@ function solve(winds: Direction[], noRocks: number): number {
       }
     }
 
-    if (range(0, WIDTH).every((tx) => grid.get(tx, y) !== undefined)) {
-      const yMax = grid.yMax;
+    yMax = Math.max(yMax, y + rock.length - 1);
 
-      const newGrid = new Grid<string>();
-
-      for (let ty = 0; ty <= yMax - y; ty++) {
-        for (let tx = 0; tx < WIDTH; tx++) {
-          const value = grid.get(tx, ty + y);
-          if (value !== undefined) {
-            newGrid.set(tx, ty, value);
-          }
-        }
+    if (firstResetWind === -1) {
+      if (windIdx >= winds.length * ROCKS.length) {
+        firstResetWind = windIdx;
+        firstResetRock = rockIdx;
+        firstResetY = yMax;
       }
+    } else {
+      if (
+        windIdx % winds.length === firstResetWind % winds.length &&
+        rockIdx % ROCKS.length === firstResetRock % ROCKS.length
+      ) {
+        const rockIncr = rockIdx - firstResetRock;
+        const yIncr = yMax - firstResetY;
 
-      grid = newGrid;
-      floor += y;
-      console.log("Resetting floor", floor);
+        const rocksLeft = noRocks - rockIdx;
+        const cyclesLeft = Math.floor(rocksLeft / rockIncr);
+        rockIdx += cyclesLeft * rockIncr;
+        ySkipped += cyclesLeft * yIncr;
+      }
     }
   }
 
-  return floor + grid.yMax;
+  return ySkipped + grid.yMax;
 }
 
 function part1(winds: Direction[]): number {
@@ -145,8 +151,8 @@ function part2(winds: Direction[]): number {
 async function main() {
   console.log(part1(await loadInput("test")));
   console.log(part1(await loadInput()));
-  // console.log(part2(await loadInput("test")));
-  // console.log(part2(await loadInput()));
+  console.log(part2(await loadInput("test")));
+  console.log(part2(await loadInput()));
 }
 
 main();
