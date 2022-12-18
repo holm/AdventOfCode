@@ -1,23 +1,26 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { identity, maxBy, min, minBy } from "lodash";
+import { identity, maxBy, range, without } from "lodash";
 import { join } from "path";
+import Graph from "node-dijkstra";
 
 type Valve = {
   name: string;
   rate: number;
-  paths: [string];
+  paths: Record<string, number>;
 };
+
+const START_VALVE = "AA";
 
 const re =
   /^Valve (\w\w) has flow rate=(\d+); tunnels? leads? to valves? ((\w\w)(, (\w\w))*)$/;
 
-async function loadInput(name = "input"): Promise<Valve[]> {
+async function loadInput(name = "input"): Promise<Map<string, Valve>> {
   const data = await fs.readFile(join(__dirname, `${name}.txt`), {
     encoding: "utf-8",
   });
 
-  return data
+  const valves = data
     .split("\n")
     .filter(identity)
     .map((line) => {
@@ -27,123 +30,167 @@ async function loadInput(name = "input"): Promise<Valve[]> {
       return {
         name: match[1],
         rate: parseInt(match[2]),
-        paths: match[3].split(", "),
+        paths: Object.fromEntries(
+          match[3].split(", ").map((target) => [target, 1])
+        ),
       } as Valve;
     });
+
+  const graph = new Graph();
+  for (const valve of valves) {
+    graph.addNode(valve.name, valve.paths);
+  }
+
+  const valveMap = new Map();
+
+  for (const valve of valves) {
+    if (valve.rate === 0 && valve.name !== START_VALVE) {
+      continue;
+    }
+
+    const directPaths: Record<string, number> = {};
+
+    for (const targetValve of valves) {
+      if (targetValve.rate === 0) {
+        continue;
+      }
+
+      const { path, cost } = graph.path(valve.name, targetValve.name, {
+        cost: true,
+      }) as {
+        path: string[];
+        cost: number;
+      };
+
+      if (path !== null) {
+        directPaths[targetValve.name] = cost;
+      }
+    }
+
+    valveMap.set(valve.name, {
+      ...valve,
+      paths: directPaths,
+    });
+  }
+
+  return valveMap;
 }
 
-type ValveStatus = Map<string, number>;
-
 type Solution = {
-  status: ValveStatus;
+  usedValves: Set<string>;
   release: number;
+};
+
+type Actor = {
+  minutesLeft: number;
+  valve: string;
 };
 
 function search(
   valves: Map<string, Valve>,
-  positions: Valve[],
-  positionIdx = 0,
-  minutesLeft = 30,
-  status: ValveStatus = new Map(),
+  actors: Actor[],
+  usedValves: Set<string> = new Set(),
   cache: Map<string, Solution> = new Map()
 ): Solution {
-  if (minutesLeft === 1) {
+  if (actors.length === 0) {
     return {
-      status,
+      usedValves,
       release: 0,
     };
-  } else if (positionIdx === positions.length) {
-    return search(valves, positions, 0, minutesLeft - 1, status, cache);
   }
 
-  const cacheKey =
-    positionIdx === 0
-      ? `${minutesLeft}-${positions
-          .map((position) => position.name)
-          .join(":")}-${[...status.keys()].join("")}`
-      : undefined;
-  if (cacheKey !== undefined) {
-    const cachedResult = cache.get(cacheKey);
-    if (cachedResult !== undefined) {
-      return cachedResult;
+  const cacheKey = [
+    ...actors.map((actor) => `${actor.valve}=${actor.minutesLeft}`).sort(),
+    ":",
+    [...usedValves.keys()].sort().join("-"),
+  ].join("");
+  const cachedResult = cache.get(cacheKey);
+  if (cachedResult !== undefined) {
+    return cachedResult;
+  }
+
+  const solutions: Solution[] = [];
+
+  for (const actor of actors) {
+    const otherActors = without(actors, actor);
+    const sourceValve = valves.get(actor.valve) as Valve;
+
+    for (const [targetValveName, distance] of Object.entries(
+      sourceValve.paths
+    )) {
+      if (!usedValves.has(targetValveName) && distance < actor.minutesLeft) {
+        const targetValve = valves.get(targetValveName) as Valve;
+
+        const minutesLeft = actor.minutesLeft - distance - 1;
+
+        const updatedActors = [...otherActors];
+        if (minutesLeft > 2) {
+          updatedActors.push({
+            minutesLeft,
+            valve: targetValveName,
+          });
+        }
+
+        const updatedUsedValves = new Set([
+          ...usedValves.values(),
+          targetValveName,
+        ]);
+
+        const subSolution = search(
+          valves,
+          updatedActors,
+          updatedUsedValves,
+          cache
+        );
+
+        solutions.push({
+          usedValves: subSolution.usedValves,
+          release: minutesLeft * targetValve.rate + subSolution.release,
+        });
+      }
     }
   }
 
-  const position = positions[positionIdx];
-
-  const solutions = position.paths.map((nextValve) => {
-    const updatedPositions = [...positions];
-    updatedPositions[positionIdx] = valves.get(nextValve) as Valve;
-
-    return search(
-      valves,
-      updatedPositions,
-      positionIdx + 1,
-      minutesLeft,
-      status,
-      cache
-    );
-  });
-
-  const valveStatus = status.get(position.name);
-  if (valveStatus === undefined && position.rate > 0) {
-    const updatedStatus = new Map(status.entries());
-    updatedStatus.set(position.name, minutesLeft - 1);
-
-    const solution = search(
-      valves,
-      positions,
-      positionIdx + 1,
-      minutesLeft,
-      updatedStatus,
-      cache
-    );
-
-    solutions.push({
-      status: solution.status,
-      release: solution.release + (minutesLeft - 1) * position.rate,
-    });
-  }
-
   let bestSolution = maxBy(solutions, (solution) => solution.release);
-
   if (bestSolution === undefined) {
     bestSolution = {
-      status,
+      usedValves,
       release: 0,
     };
   }
 
-  if (cacheKey !== undefined) {
-    cache.set(cacheKey, bestSolution);
-  }
+  cache.set(cacheKey, bestSolution);
 
   return bestSolution;
 }
 
-function part1(valves: Valve[]): number {
-  const valvesMap = new Map(valves.map((valve) => [valve.name, valve]));
-
-  const startValve = valvesMap.get("AA") as Valve;
-
-  const solution = search(valvesMap, [startValve]);
+function solve(
+  valvesMap: Map<string, Valve>,
+  time: number,
+  actors: number
+): number {
+  const solution = search(
+    valvesMap,
+    range(0, actors).map(() => ({
+      minutesLeft: time,
+      valve: START_VALVE,
+    }))
+  );
 
   return solution.release;
 }
 
-function part2(valves: Valve[]): number {
-  const valvesMap = new Map(valves.map((valve) => [valve.name, valve]));
+function part1(valvesMap: Map<string, Valve>): number {
+  return solve(valvesMap, 30, 1);
+}
 
-  const startValve = valvesMap.get("AA") as Valve;
-
-  const solution = search(valvesMap, [startValve, startValve], 0, 26);
-
-  return solution.release;
+function part2(valvesMap: Map<string, Valve>): number {
+  return solve(valvesMap, 26, 2);
 }
 
 async function main() {
-  // console.log(part1(await loadInput("test")));
-  // console.log(part1(await loadInput()));
+  console.log(part1(await loadInput("test")));
+  console.log(part1(await loadInput()));
   console.log(part2(await loadInput("test")));
   console.log(part2(await loadInput()));
 }
