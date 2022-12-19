@@ -1,6 +1,4 @@
-import { assert } from "console";
 import fs from "fs/promises";
-import { range } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
 
@@ -36,12 +34,6 @@ const ROCKS: Rock[] = [
 ];
 
 const WIDTH = 7;
-
-function renderRow(grid: Grid<string>, y: number): string {
-  return range(0, WIDTH)
-    .map((x) => grid.get(x, y, "."))
-    .join("");
-}
 
 function willHit(
   grid: Grid<unknown>,
