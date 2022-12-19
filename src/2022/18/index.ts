@@ -116,6 +116,7 @@ function part2(coords: Coordinate[]): number {
 
   return count;
 }
+
 async function main() {
   console.log(part1(await loadInput("test")));
   console.log(part1(await loadInput()));
