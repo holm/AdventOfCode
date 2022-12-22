@@ -14,38 +14,16 @@ async function loadInput(name = "input"): Promise<number[]> {
     .map((value) => parseInt(value));
 }
 
-function printList(start: Entry): void {
-  const values: number[] = [];
-  let current = start;
-  do {
-    values.push(current.value);
-    current = current.next;
-  } while (current !== start);
-
-  console.log(values.join(", "));
-}
-
-function validateList(start: Entry, length: number): void {
-  let current = start;
-  let count = 0;
-
-  do {
-    assert(current.next.prev === current);
-    assert(current.prev.next === current);
-    current = current.next;
-    count += 1;
-  } while (current !== start);
-
-  assert(count === length);
-}
-
-type Entry = {
+type LinkedListEntry = {
   value: number;
-  prev: Entry;
-  next: Entry;
+  prev: LinkedListEntry;
+  next: LinkedListEntry;
 };
 
-function moveForward(entry: Entry, distance: number): Entry {
+function moveForward(
+  entry: LinkedListEntry,
+  distance: number
+): LinkedListEntry {
   let current = entry;
 
   for (let i = 0; i < distance; i++) {
@@ -55,25 +33,44 @@ function moveForward(entry: Entry, distance: number): Entry {
   return current;
 }
 
-function part1(input: number[]): number {
-  const entries = input.map((value) => ({ value } as Entry));
+function buildLinkedList(input: number[]): LinkedListEntry[] {
+  const entries = input.map((value) => ({ value } as LinkedListEntry));
 
   for (const [idx, entry] of entries.entries()) {
     entry.prev = entries[idx === 0 ? input.length - 1 : idx - 1];
     entry.next = entries[idx === input.length - 1 ? 0 : idx + 1];
   }
 
-  // printList(entries[0]);
+  return entries;
+}
 
+function findValue(entry: LinkedListEntry, value: number): LinkedListEntry {
+  while (entry.value !== value) {
+    entry = entry.next;
+  }
+
+  return entry;
+}
+
+function getCode(entries: LinkedListEntry[]): number {
+  const zero = findValue(entries[0], 0);
+
+  const first = moveForward(zero, 1000 % entries.length);
+  const second = moveForward(first, 1000 % entries.length);
+  const third = moveForward(second, 1000 % entries.length);
+
+  return first.value + second.value + third.value;
+}
+
+function mix(entries: LinkedListEntry[]): void {
   for (const entry of entries) {
-    let netMove = entry.value % input.length;
+    let netMove = entry.value % (entries.length - 1);
     if (netMove < 0) {
-      netMove += input.length - 1;
-      netMove = netMove % input.length;
+      netMove += entries.length - 1;
+      netMove %= entries.length - 1;
     }
 
-    console.log(entry.value, netMove);
-    assert(netMove >= 0);
+    assert(netMove >= 0 && netMove < entries.length);
     if (netMove > 0) {
       const current = moveForward(entry, netMove);
 
@@ -85,36 +82,37 @@ function part1(input: number[]): number {
 
       current.next.prev = entry;
       current.next = entry;
-
-      validateList(entry, input.length);
     }
-    // console.log("moved", entry.value);
-    // printList(entry);
   }
-
-  let entry = entries[0];
-  while (entry.value !== 0) {
-    entry = entry.next;
-  }
-
-  const first = moveForward(entry, 1000);
-  const second = moveForward(first, 1000);
-  const third = moveForward(second, 1000);
-
-  console.log(first.value, second.value, third.value);
-
-  return first.value + second.value + third.value;
 }
 
+function part1(input: number[]): number {
+  const entries = buildLinkedList(input);
+
+  mix(entries);
+
+  return getCode(entries);
+}
+
+const DECRYPTION_KEY = 811589153;
+
 function part2(input: number[]): number {
-  return 0;
+  input = input.map((value) => value * DECRYPTION_KEY);
+
+  const entries = buildLinkedList(input);
+
+  for (let i = 0; i < 10; i++) {
+    mix(entries);
+  }
+
+  return getCode(entries);
 }
 
 async function main() {
   console.log(part1(await loadInput("test")));
   console.log(part1(await loadInput()));
-  // console.log(part2(await loadInput("test")));
-  // console.log(part2(await loadInput()));
+  console.log(part2(await loadInput("test")));
+  console.log(part2(await loadInput()));
 }
 
 main();
