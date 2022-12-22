@@ -1,5 +1,4 @@
 import assert from "assert";
-import { time } from "console";
 import fs from "fs/promises";
 import { identity } from "lodash";
 import { join } from "path";
