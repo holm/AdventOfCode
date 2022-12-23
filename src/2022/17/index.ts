@@ -130,7 +130,7 @@ function solve(winds: Direction[], noRocks: number): number {
     }
   }
 
-  return ySkipped + grid.yMax;
+  return ySkipped + (grid.getYRange()?.max || 0);
 }
 
 function part1(winds: Direction[]): number {

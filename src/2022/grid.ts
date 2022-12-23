@@ -1,20 +1,62 @@
+export class Range {
+  min?: number;
+  max?: number;
+
+  update(value: number): void {
+    if (this.min === undefined || this.min > value) {
+      this.min = value;
+    }
+    if (this.max === undefined || this.max < value) {
+      this.max = value;
+    }
+  }
+}
+
+export class Column<T> {
+  values = new Map<number, T>();
+  range = new Range();
+
+  get(y: number): T | undefined {
+    return this.values.get(y);
+  }
+
+  set(y: number, value: T): void {
+    this.values.set(y, value);
+
+    this.range.update(y);
+  }
+}
+
 export class Grid<T> {
-  data = new Map<number, Map<number, T>>();
+  yValues = new Map<number, Column<T>>();
+  xRange = new Range();
+  xRanges = new Map<number, Range>();
+  yRange = new Range();
 
   set(x: number, y: number, value: T): void {
-    let column = this.data.get(x);
-    if (column === undefined) {
-      column = new Map<number, T>();
-      this.data.set(x, column);
-    }
+    let yValuesForX = this.yValues.get(x);
+    if (yValuesForX === undefined) {
+      yValuesForX = new Column<T>();
+      this.yValues.set(x, yValuesForX);
 
-    column.set(y, value);
+      this.xRange.update(x);
+    }
+    yValuesForX.set(y, value);
+
+    this.yRange.update(y);
+
+    let xRangeForY = this.xRanges.get(y);
+    if (xRangeForY === undefined) {
+      xRangeForY = new Range();
+      this.xRanges.set(y, xRangeForY);
+    }
+    xRangeForY.update(x);
   }
 
   get(x: number, y: number, defaultValue?: T): T | undefined {
-    const column = this.data.get(x);
-    if (column !== undefined) {
-      const value = column.get(y);
+    const yValuesForX = this.yValues.get(x);
+    if (yValuesForX !== undefined) {
+      const value = yValuesForX.get(y);
       if (value !== undefined) {
         return value;
       }
@@ -23,32 +65,22 @@ export class Grid<T> {
     return defaultValue;
   }
 
-  private xs(): Iterable<number> {
-    return this.data.keys();
-  }
+  getYRange(x?: number): Range {
+    if (x !== undefined) {
+      const column = this.yValues.get(x);
 
-  get xMin(): number {
-    return Math.min(...this.xs());
-  }
-
-  get xMax(): number {
-    return Math.max(...this.xs());
-  }
-
-  private *ys(): Iterable<number> {
-    for (const column of this.data.values()) {
-      for (const y of column.keys()) {
-        yield y;
-      }
+      return column?.range || new Range();
+    } else {
+      return this.yRange;
     }
   }
 
-  get yMin(): number {
-    return Math.min(...this.ys());
-  }
-
-  get yMax(): number {
-    return Math.max(...this.ys());
+  getXRange(y?: number): Range {
+    if (y !== undefined) {
+      return this.xRanges.get(y) || new Range();
+    } else {
+      return this.xRange;
+    }
   }
 }
 

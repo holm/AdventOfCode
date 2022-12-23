@@ -31,9 +31,6 @@ async function loadInput(): Promise<Path[]> {
 const HOLE: Coordinate = { x: 500, y: 0 };
 
 function createGrid(paths: Path[]): Grid {
-  const xs = flatten(
-    paths.map((path) => flatten(path.map((coord) => coord.x)))
-  );
   const ys = flatten(
     paths.map((path) => flatten(path.map((coord) => coord.y)))
   );
