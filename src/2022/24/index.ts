@@ -28,7 +28,7 @@ const directionOffsets: Record<Direction, Coordinate> = {
 };
 const moves: Coordinate[] = [
   ...Object.values(directionOffsets),
-  { x: 0, y: 0 },
+  { x: 0, y: 0 }, // Stay at same place
 ];
 
 async function loadInput(name = "input"): Promise<Input> {
@@ -96,6 +96,8 @@ async function loadInput(name = "input"): Promise<Input> {
   return { grid, xWinds, yWinds };
 }
 
+type Solution = number | null;
+
 function solve(
   grid: Grid<boolean>,
   xWinds: WindMap,
@@ -104,8 +106,8 @@ function solve(
   target: Coordinate,
   time: number,
   maxTime: number,
-  cache: Map<string, number | null> = new Map()
-): number | null {
+  cache: Map<string, Solution> = new Map()
+): Solution {
   const minDistance =
     Math.abs(position.x - target.x) + Math.abs(position.y - target.y);
   if (minDistance === 0) {
@@ -122,7 +124,7 @@ function solve(
     return cachedValue;
   }
 
-  let bestSolution: number | null = null;
+  let bestSolution: Solution = null;
   const yRange = grid.getYRange();
 
   for (const move of moves) {
@@ -211,10 +213,10 @@ function solveIteratively(
       maxTime
     );
     if (timeUsed !== null) {
-      return timeUsed - 1;
+      return timeUsed - 1; // Final move is "free"
     }
 
-    maxTime += Math.floor(maxTime * 1.1);
+    maxTime += Math.floor(maxTime * 1.1); // Increase time bound by 10%
   }
 }
 
