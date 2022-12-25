@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { identity } from "lodash";
+import { identity, uniqBy } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
 
@@ -96,86 +96,61 @@ async function loadInput(name = "input"): Promise<Input> {
   return { grid, xWinds, yWinds };
 }
 
-type Solution = number | null;
-
 function solve(
   grid: Grid<boolean>,
   xWinds: WindMap,
   yWinds: WindMap,
-  position: Coordinate,
+  start: Coordinate,
   target: Coordinate,
-  time: number,
-  maxTime: number,
-  cache: Map<string, Solution> = new Map()
-): Solution {
-  const minDistance =
-    Math.abs(position.x - target.x) + Math.abs(position.y - target.y);
-  if (minDistance === 0) {
-    // Arrived
-    return time;
-  } else if (minDistance > maxTime - time) {
-    // Too far
-    return null;
-  }
-
-  const cacheKey = `${time}:${position.x}:${position.y}`;
-  const cachedValue = cache.get(cacheKey);
-  if (cachedValue !== undefined) {
-    return cachedValue;
-  }
-
-  let bestSolution: Solution = null;
+  time: number
+): number {
   const yRange = grid.getYRange();
+  let possible: Coordinate[] = [start];
 
-  for (const move of moves) {
-    const newPosition = { x: position.x + move.x, y: position.y + move.y };
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const nextPossible: Coordinate[] = [];
 
-    // Check wall
-    if (
-      grid.get(newPosition.x, newPosition.y) === true ||
-      newPosition.y < (yRange.min as number) ||
-      newPosition.y > (yRange.max as number)
-    ) {
-      continue;
+    for (const position of possible) {
+      for (const move of moves) {
+        const newPosition = { x: position.x + move.x, y: position.y + move.y };
+
+        if (newPosition.x === target.x && newPosition.y === target.y) {
+          return time;
+        }
+
+        // Check wall
+        if (
+          grid.get(newPosition.x, newPosition.y) === true ||
+          newPosition.y < (yRange.min as number) ||
+          newPosition.y > (yRange.max as number)
+        ) {
+          continue;
+        }
+
+        // Check x-axis winds
+        const blockedXWinds = (
+          xWinds.get(newPosition.x) as WindCalculated[]
+        ).some((wind) => wind.calculator(time) === newPosition.y);
+        if (blockedXWinds) {
+          continue;
+        }
+
+        // Check y-axis winds
+        const blockedYWinds = (
+          yWinds.get(newPosition.y) as WindCalculated[]
+        ).some((wind) => wind.calculator(time) === newPosition.x);
+        if (blockedYWinds) {
+          continue;
+        }
+
+        nextPossible.push(newPosition);
+      }
     }
 
-    // Check x-axis winds
-    const blockedXWinds = (xWinds.get(newPosition.x) as WindCalculated[]).some(
-      (wind) => wind.calculator(time) === newPosition.y
-    );
-    if (blockedXWinds) {
-      continue;
-    }
-
-    // Check y-axis winds
-    const blockedYWinds = (yWinds.get(newPosition.y) as WindCalculated[]).some(
-      (wind) => wind.calculator(time) === newPosition.x
-    );
-    if (blockedYWinds) {
-      continue;
-    }
-
-    const solutionValue = solve(
-      grid,
-      xWinds,
-      yWinds,
-      newPosition,
-      target,
-      time + 1,
-      maxTime,
-      cache
-    );
-    if (
-      solutionValue !== null &&
-      (bestSolution === null || solutionValue < bestSolution)
-    ) {
-      bestSolution = solutionValue;
-    }
+    possible = uniqBy(nextPossible, (entry) => `${entry.x},${entry.y}`);
+    time = time + 1;
   }
-
-  cache.set(cacheKey, bestSolution);
-
-  return bestSolution;
 }
 
 function findHole(grid: Grid<boolean>, y: number): Coordinate {
@@ -190,50 +165,20 @@ function findHole(grid: Grid<boolean>, y: number): Coordinate {
   throw new Error("Cannot find hole");
 }
 
-function solveIteratively(
-  grid: Grid<boolean>,
-  xWinds: WindMap,
-  yWinds: WindMap,
-  start: Coordinate,
-  end: Coordinate,
-  startTime: number
-): number {
-  let maxTime =
-    startTime + Math.abs(start.x - end.x) + Math.abs(start.y - end.y);
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const timeUsed = solve(
-      grid,
-      xWinds,
-      yWinds,
-      start,
-      end,
-      startTime,
-      maxTime
-    );
-    if (timeUsed !== null) {
-      return timeUsed - 1; // Final move is "free"
-    }
-
-    maxTime += Math.floor(maxTime * 1.1); // Increase time bound by 10%
-  }
-}
-
 function part1({ grid, xWinds, yWinds }: Input): number {
   const entry = findHole(grid, 0);
   const exit = findHole(grid, grid.getYRange().max as number);
 
-  return solveIteratively(grid, xWinds, yWinds, entry, exit, 0);
+  return solve(grid, xWinds, yWinds, entry, exit, 0);
 }
 
 function part2({ grid, xWinds, yWinds }: Input): number {
   const entry = findHole(grid, 0);
   const exit = findHole(grid, grid.getYRange().max as number);
 
-  const time1 = solveIteratively(grid, xWinds, yWinds, entry, exit, 0);
-  const time2 = solveIteratively(grid, xWinds, yWinds, exit, entry, time1 + 1);
-  const time3 = solveIteratively(grid, xWinds, yWinds, entry, exit, time2 + 1);
+  const time1 = solve(grid, xWinds, yWinds, entry, exit, 0);
+  const time2 = solve(grid, xWinds, yWinds, exit, entry, time1 + 1);
+  const time3 = solve(grid, xWinds, yWinds, entry, exit, time2 + 1);
 
   return time3;
 }
