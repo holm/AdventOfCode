@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { identity, sumBy } from "lodash";
+import { identity, sum, sumBy } from "lodash";
 import { join } from "path";
 
 const colors = ["red", "green", "blue"] as const;
@@ -38,7 +38,7 @@ async function loadInput(): Promise<Game[]> {
   });
 }
 
-async function main() {
+async function part1() {
   const games = await loadInput();
 
   const limit = {
@@ -67,4 +67,26 @@ async function main() {
   console.log(result);
 }
 
-main();
+async function part2() {
+  const games = await loadInput();
+
+  const powers = games.map((game) => {
+    const limit = Object.fromEntries(colors.map((color) => [color, 0])) as Grab;
+    for (const grab of game.grabs) {
+      for (const [color, count] of Object.entries(grab)) {
+        limit[color as Color] = Math.max(count, limit[color as Color]);
+      }
+    }
+
+    const power = limit.blue * limit.green * limit.red;
+
+    return power;
+  });
+
+  const result = sum(powers);
+
+  console.log(result);
+}
+
+part1();
+part2();
