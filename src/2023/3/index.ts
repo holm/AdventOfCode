@@ -1,11 +1,25 @@
 import fs from "fs/promises";
-import { identity, range, sum } from "lodash";
+import { groupBy, identity, range, sumBy } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
 import assert from "assert";
 
+const indicators = ["*", "#", "$"] as const;
+type Indicator = (typeof indicators)[number];
+
+type Usage = {
+  indicator: Indicator;
+  x: number;
+  y: number;
+};
+
+type Part = {
+  number: number;
+  usage: Usage;
+};
+
 async function loadInput(): Promise<Grid<string>> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "example.txt"), {
     encoding: "utf-8",
   });
 
@@ -29,13 +43,11 @@ function isSymbol(c: string | undefined): boolean {
   return c !== undefined && c !== "." && !isDigit(c);
 }
 
-async function part1() {
-  const grid = await loadInput();
-
+function extractParts(grid: Grid<string>): Part[] {
   const yArray = grid.getYRange().asArray();
   assert(yArray);
 
-  const validParts: number[] = [];
+  const parts: Part[] = [];
 
   for (const y of yArray) {
     const xRange = grid.getXRange(y);
@@ -62,21 +74,28 @@ async function part1() {
             .join("")
         );
 
-        let validPart = false;
-        for (let xCheck = xStart - 1; xCheck <= xEnd; xCheck++) {
-          if (
-            isSymbol(grid.get(xCheck, y - 1)) ||
-            isSymbol(grid.get(xCheck, y + 1)) ||
-            (xCheck == xStart - 1 && isSymbol(grid.get(xCheck, y))) ||
-            (xCheck == xEnd && isSymbol(grid.get(xCheck, y)))
-          ) {
-            validPart = true;
-            break;
+        checkLoop: for (let xCheck = xStart - 1; xCheck <= xEnd; xCheck++) {
+          const yChecks = [y - 1, y + 1];
+          if (xCheck == xStart - 1 || xCheck == xEnd) {
+            yChecks.push(y);
           }
-        }
 
-        if (validPart) {
-          validParts.push(partNumber);
+          for (const yCheck of yChecks) {
+            const checkValue = grid.get(xCheck, yCheck);
+            if (isSymbol(checkValue)) {
+              const usage = {
+                indicator: checkValue as Indicator,
+                x: xCheck,
+                y: yCheck,
+              };
+              parts.push({
+                number: partNumber,
+                usage,
+              });
+
+              break checkLoop;
+            }
+          }
         }
 
         xStart = xEnd;
@@ -86,13 +105,37 @@ async function part1() {
     }
   }
 
-  const result = sum(validParts);
+  return parts;
+}
+
+async function part1() {
+  const grid = await loadInput();
+  const parts = extractParts(grid);
+
+  const result = sumBy(parts, (part) => part.number);
   console.log(result);
 }
 
 async function part2() {
   const grid = await loadInput();
+  const parts = extractParts(grid);
+
+  const gearParts = parts.filter((part) => part.usage.indicator === "*");
+
+  const groupedGearParts = groupBy(
+    gearParts,
+    (part) => `${part.usage.x}-${part.usage.y}`
+  );
+
+  const result = sumBy(Object.values(groupedGearParts), (parts) => {
+    if (parts.length === 2) {
+      return parts[0].number * parts[1].number;
+    } else {
+      return 0;
+    }
+  });
+  console.log(result);
 }
 
 part1();
-// part2();
+part2();
