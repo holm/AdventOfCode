@@ -1,9 +1,9 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { identity, last, sortBy, sum } from "lodash";
+import { identity, sum } from "lodash";
 import { join } from "path";
 
-async function loadInput(): Promise<String[]> {
+async function loadInput(): Promise<string[]> {
   const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
@@ -25,7 +25,7 @@ const TEXT_MAP = {
   nine: 9,
 };
 
-function lineToDigits(line: String): number[] {
+function lineToDigits(line: string): number[] {
   const numbers: number[] = [];
 
   for (let i = 0; i < line.length; i++) {
