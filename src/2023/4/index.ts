@@ -1,4 +1,3 @@
-import assert from "assert";
 import fs from "fs/promises";
 import { identity, intersection, reverse, sum } from "lodash";
 import { join } from "path";
