@@ -1,6 +1,6 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { min } from "lodash";
+import { chunk, min, range } from "lodash";
 import { join } from "path";
 
 type Range = (source: number) => number | undefined;
@@ -50,31 +50,51 @@ async function loadInput(): Promise<Input> {
   return { seeds, mappings };
 }
 
+function getLocation(seed: number, mappings: Mapping[]): number {
+  let value = seed;
+
+  for (const mapping of mappings) {
+    for (const range of mapping) {
+      const nextValue = range(value);
+      if (nextValue !== undefined) {
+        value = nextValue;
+        break;
+      }
+    }
+  }
+
+  return value;
+}
+
+function getClosestLocation(
+  seeds: number[],
+  mappings: Mapping[]
+): number | undefined {
+  const locations = seeds.map((seed) => getLocation(seed, mappings));
+
+  return min(locations);
+}
+
 async function part1() {
   const input = await loadInput();
 
-  const locations = input.seeds.map((seed) => {
-    let value = seed;
-    for (const mapping of input.mappings) {
-      for (const range of mapping) {
-        const nextValue = range(value);
-        if (nextValue !== undefined) {
-          value = nextValue;
-          break;
-        }
-      }
-    }
-
-    return value;
-  });
-
-  const result = min(locations);
+  const result = getClosestLocation(input.seeds, input.mappings);
   console.log(result);
 }
 
 async function part2() {
   const input = await loadInput();
+
+  const seeds: number[] = [];
+
+  const pairs = chunk(input.seeds, 2);
+  for (const [start, length] of pairs) {
+    seeds.push(...range(start, start + length));
+  }
+
+  const result = getClosestLocation(seeds, input.mappings);
+  console.log(result);
 }
 
-part1();
-// part2();
+// part1();
+part2();
