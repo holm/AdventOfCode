@@ -23,7 +23,6 @@ async function loadInput(): Promise<Race[]> {
 
   const times = parseNumbers(timesLine);
   const distances = parseNumbers(distancesLine);
-  console.log(times, distances);
 
   return zip(times, distances).map(([time, distance]) => {
     assert(time);
@@ -72,9 +71,14 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const result = "";
+  const race = {
+    time: parseInt(input.map((race) => race.time).join("")),
+    distance: parseInt(input.map((race) => race.distance).join("")),
+  };
+
+  const result = solutions(race);
   console.log("part2", result);
 }
 
 part1();
-// part2();
+part2();
