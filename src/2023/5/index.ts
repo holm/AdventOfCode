@@ -1,19 +1,28 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { chunk, min, range } from "lodash";
+import { chunk, flatten, identity, min } from "lodash";
 import { join } from "path";
 
-type Range = (source: number) => number | undefined;
+type Range = {
+  start: number;
+  length: number;
+};
 
-type Mapping = Range[];
+type Mapping = {
+  destinationStart: number;
+  sourceStart: number;
+  length: number;
+};
+
+type RangeMapper = (range: Range) => Range[];
 
 type Input = {
   seeds: number[];
-  mappings: Mapping[];
+  mappers: RangeMapper[];
 };
 
 async function loadInput(): Promise<Input> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "example.txt"), {
     encoding: "utf-8",
   });
 
@@ -27,73 +36,119 @@ async function loadInput(): Promise<Input> {
     .split(" ")
     .map((seedRaw) => parseInt(seedRaw));
 
-  const mappings = sections.map((section) => {
-    const lines = section.split("\n");
+  const mappers = sections.map((section) => {
+    const lines = section.split("\n").filter(identity);
 
-    return lines.slice(1).map((line) => {
+    const mappings: Mapping[] = lines.slice(1).map((line) => {
       const lineParts = line.split(" ");
 
       const destinationStart = parseInt(lineParts[0]);
       const sourceStart = parseInt(lineParts[1]);
       const length = parseInt(lineParts[2]);
 
-      return (source: number) => {
-        if (source >= sourceStart && source < sourceStart + length) {
-          return source + destinationStart - sourceStart;
-        } else {
-          return;
-        }
+      return {
+        destinationStart,
+        sourceStart,
+        length,
       };
     });
+
+    return (range: Range): Range[] => {
+      const result: Range[] = [];
+      let stack = [range];
+
+      for (const mapping of mappings) {
+        const sourceStart = mapping.sourceStart;
+        const sourceEnd = mapping.sourceStart + mapping.length;
+
+        const nextStack: Range[] = [];
+
+        for (const entry of stack) {
+          const entryStart = entry.start;
+          const entryEnd = entry.start + entry.length;
+
+          if (entryStart > sourceEnd || sourceStart > entryEnd) {
+            nextStack.push(entry);
+            continue;
+          }
+
+          const leftLength = sourceStart - entryStart;
+          if (leftLength > 0) {
+            nextStack.push({ start: entryStart, length: leftLength });
+          }
+
+          const rightLength = entryEnd - sourceEnd;
+          if (rightLength > 0) {
+            nextStack.push({ start: entryStart, length: rightLength });
+          }
+
+          const mappedStart = Math.max(entryStart, sourceStart);
+          const mappedEnd = Math.min(entryEnd, sourceEnd);
+
+          if (mappedStart < mappedEnd) {
+            const resultEntry: Range = {
+              start: mappedStart - sourceStart + mapping.destinationStart,
+              length: mappedEnd - mappedStart,
+            };
+            result.push(resultEntry);
+          }
+        }
+
+        stack = nextStack;
+      }
+
+      return [...result, ...stack];
+    };
   });
 
-  return { seeds, mappings };
+  return { seeds, mappers };
 }
 
-function getLocation(seed: number, mappings: Mapping[]): number {
-  let value = seed;
+function getLocations(seedRanges: Range[], mappers: RangeMapper[]): Range[] {
+  let ranges = seedRanges;
 
-  for (const mapping of mappings) {
-    for (const range of mapping) {
-      const nextValue = range(value);
-      if (nextValue !== undefined) {
-        value = nextValue;
-        break;
-      }
-    }
+  for (const mapper of mappers) {
+    console.log("ranges", ranges);
+    ranges = flatten(ranges.map((range) => mapper(range)));
   }
+  console.log("location", ranges);
 
-  return value;
+  return ranges;
 }
 
 function getClosestLocation(
-  seeds: number[],
-  mappings: Mapping[]
+  seedRanges: Range[],
+  mappers: RangeMapper[]
 ): number | undefined {
-  const locations = seeds.map((seed) => getLocation(seed, mappings));
+  const locations = getLocations(seedRanges, mappers);
 
-  return min(locations);
+  return min(locations.map((location) => location.start));
 }
 
 async function part1() {
   const input = await loadInput();
 
-  const result = getClosestLocation(input.seeds, input.mappings);
-  console.log(result);
+  const seedRanges = input.seeds.map((seed) => ({ start: seed, length: 1 }));
+
+  const result = getClosestLocation(seedRanges, input.mappers);
+  console.log("part1", result);
 }
 
 async function part2() {
   const input = await loadInput();
 
-  const seeds: number[] = [];
+  const seedRanges: Range[] = [];
 
   const pairs = chunk(input.seeds, 2);
   for (const [start, length] of pairs) {
-    seeds.push(...range(start, start + length));
+    seedRanges.push({
+      start,
+      length,
+    });
   }
 
-  const result = getClosestLocation(seeds, input.mappings);
-  console.log(result);
+  const result = getClosestLocation(seedRanges, input.mappers);
+  console.log("part2", result);
 }
 
 // part1();
