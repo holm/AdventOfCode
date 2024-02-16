@@ -1,6 +1,6 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { chunk, flatten, identity, min } from "lodash";
+import { chunk, flatten, identity, min, sumBy } from "lodash";
 import { join } from "path";
 
 type Range = {
@@ -22,7 +22,7 @@ type Input = {
 };
 
 async function loadInput(): Promise<Input> {
-  const data = await fs.readFile(join(__dirname, "example.txt"), {
+  const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
 
@@ -79,7 +79,10 @@ async function loadInput(): Promise<Input> {
 
           const rightLength = entryEnd - sourceEnd;
           if (rightLength > 0) {
-            nextStack.push({ start: entryStart, length: rightLength });
+            nextStack.push({
+              start: entryEnd - rightLength,
+              length: rightLength,
+            });
           }
 
           const mappedStart = Math.max(entryStart, sourceStart);
@@ -97,7 +100,10 @@ async function loadInput(): Promise<Input> {
         stack = nextStack;
       }
 
-      return [...result, ...stack];
+      const allRanges = [...result, ...stack];
+      assert(range.length === sumBy(allRanges, (range) => range.length));
+
+      return allRanges;
     };
   });
 
@@ -137,19 +143,16 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const seedRanges: Range[] = [];
-
-  const pairs = chunk(input.seeds, 2);
-  for (const [start, length] of pairs) {
-    seedRanges.push({
+  const seedRanges: Range[] = chunk(input.seeds, 2).map(([start, length]) => {
+    return {
       start,
       length,
-    });
-  }
+    };
+  });
 
   const result = getClosestLocation(seedRanges, input.mappers);
   console.log("part2", result);
 }
 
-// part1();
+part1();
 part2();
