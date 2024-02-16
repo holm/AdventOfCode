@@ -55,31 +55,32 @@ async function loadInput(): Promise<Input> {
 
     return (range: Range): Range[] => {
       const result: Range[] = [];
-      let stack = [range];
+      let unmapped = [range];
 
       for (const mapping of mappings) {
         const sourceStart = mapping.sourceStart;
         const sourceEnd = mapping.sourceStart + mapping.length;
+        const offset = mapping.destinationStart - sourceStart;
 
-        const nextStack: Range[] = [];
+        const nextUnmapped: Range[] = [];
 
-        for (const entry of stack) {
+        for (const entry of unmapped) {
           const entryStart = entry.start;
           const entryEnd = entry.start + entry.length;
 
           if (entryStart > sourceEnd || sourceStart > entryEnd) {
-            nextStack.push(entry);
+            nextUnmapped.push(entry);
             continue;
           }
 
           const leftLength = sourceStart - entryStart;
           if (leftLength > 0) {
-            nextStack.push({ start: entryStart, length: leftLength });
+            nextUnmapped.push({ start: entryStart, length: leftLength });
           }
 
           const rightLength = entryEnd - sourceEnd;
           if (rightLength > 0) {
-            nextStack.push({
+            nextUnmapped.push({
               start: entryEnd - rightLength,
               length: rightLength,
             });
@@ -90,17 +91,17 @@ async function loadInput(): Promise<Input> {
 
           if (mappedStart < mappedEnd) {
             const resultEntry: Range = {
-              start: mappedStart - sourceStart + mapping.destinationStart,
+              start: mappedStart + offset,
               length: mappedEnd - mappedStart,
             };
             result.push(resultEntry);
           }
         }
 
-        stack = nextStack;
+        unmapped = nextUnmapped;
       }
 
-      const allRanges = [...result, ...stack];
+      const allRanges = [...result, ...unmapped];
       assert(range.length === sumBy(allRanges, (range) => range.length));
 
       return allRanges;
