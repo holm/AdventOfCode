@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { identity, sumBy } from "lodash";
+import { identity } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
 import assert from "assert";
