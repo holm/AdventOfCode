@@ -1,7 +1,8 @@
 import fs from "fs/promises";
-import { identity } from "lodash";
+import { identity, sumBy } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
+import assert from "assert";
 
 type Pipe = "|" | "-" | "L" | "J" | "7" | "F";
 type Tile = Pipe | "." | "S";
@@ -94,10 +95,10 @@ async function loadInput(): Promise<Map> {
   return { start, grid };
 }
 
-function getLoopLength(map: Map): number {
+function getLoopPath(map: Map): Coordinate[] {
   let move: Coordinate = [0, 0];
   let position = map.start;
-  let length = 0;
+  const path: Coordinate[] = [];
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -111,10 +112,10 @@ function getLoopLength(map: Map): number {
       ) {
         move = potentialMove;
         position = [position[0] + move[0], position[1] + move[1]];
-        length++;
+        path.push(position);
 
         if (position[0] === map.start[0] && position[1] === map.start[1]) {
-          return length;
+          return path;
         }
         break;
       }
@@ -125,20 +126,59 @@ function getLoopLength(map: Map): number {
 async function part1() {
   const map = await loadInput();
 
-  const result = getLoopLength(map) / 2;
+  const result = getLoopPath(map).length / 2;
   console.log("part1", result);
 }
 
 async function part2() {
   const map = await loadInput();
 
-  const result = map;
+  const path = getLoopPath(map);
+
+  const pathGrid = new Grid<boolean>();
+  for (const position of path) {
+    pathGrid.set(position[0], position[1], true);
+  }
+
+  const yRange = map.grid.getYRange();
+  const xRange = map.grid.getXRange();
+  assert(
+    yRange.min !== undefined &&
+      yRange.max !== undefined &&
+      xRange.min !== undefined &&
+      xRange.max !== undefined
+  );
+
+  let result = 0;
+  for (let y = yRange.min; y <= yRange.max; y++) {
+    let inside = false;
+    let lastPipe: Pipe | undefined = undefined;
+
+    for (let x = xRange.min; x <= xRange.max; x++) {
+      const isOnPath = pathGrid.get(x, y) === true;
+      if (isOnPath) {
+        const tile = map.grid.get(x, y);
+        if (
+          tile === "|" ||
+          (tile === "J" && lastPipe === "F") ||
+          (tile === "7" && lastPipe === "L")
+        ) {
+          inside = !inside;
+        } else if (tile === "F" || tile === "L") {
+          lastPipe = tile;
+        }
+      } else if (inside) {
+        result += 1;
+      }
+    }
+  }
+
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
