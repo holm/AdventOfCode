@@ -1,7 +1,8 @@
 import assert from "assert";
 import fs from "fs/promises";
-import { identity, sum } from "lodash";
+import { identity } from "lodash";
 import { join } from "path";
+import lcm from "compute-lcm";
 
 type Move = "R" | "L";
 
@@ -31,6 +32,7 @@ async function loadInput(): Promise<Map> {
         const match = line.match(reMove);
         assert(match);
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const [_, id, left, right] = match;
 
         return [id, { L: left, R: right }];
@@ -40,36 +42,39 @@ async function loadInput(): Promise<Map> {
   return { moves, nodes };
 }
 
-function traverse(map: Map): number {
-  let location = "AAA";
-  let moveCount = 0;
+function moves(map: Map, start: string, ghost: boolean): number {
+  let location = start;
+  let result = 0;
 
-  while (location !== "ZZZ") {
-    const nextMove = map.moves[moveCount % map.moves.length];
+  while (ghost ? !location.endsWith("Z") : location !== "ZZZ") {
+    const nextMove = map.moves[result % map.moves.length];
     location = map.nodes[location][nextMove];
-    moveCount++;
+    result++;
   }
 
-  return moveCount;
+  return result;
 }
 
 async function part1() {
-  const input = await loadInput();
+  const map = await loadInput();
 
-  const result = traverse(input);
+  const result = moves(map, "AAA", false);
   console.log("part1", result);
 }
 
 async function part2() {
-  const input = await loadInput();
+  const map = await loadInput();
 
-  const result = input;
+  const starts = Object.keys(map.nodes).filter((node) => node.endsWith("A"));
+  const startMoves = starts.map((start) => moves(map, start, true));
+
+  const result = lcm(startMoves);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
