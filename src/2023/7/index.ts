@@ -1,6 +1,5 @@
-import assert from "assert";
 import fs from "fs/promises";
-import { countBy, identity, reverse, sortBy, sum } from "lodash";
+import { countBy, identity, reverse, size, sortBy, sum } from "lodash";
 import { join } from "path";
 
 const cardValues = [
@@ -39,9 +38,17 @@ const handTypes = [
 ] as const;
 type HandType = (typeof handTypes)[number];
 
-function getType(hand: Hand): HandType {
+function getType(hand: Hand, jokers: boolean): HandType {
   const countsDict = countBy(hand);
-  const counts = reverse(sortBy(Object.values(countsDict)));
+
+  let jokersCount = 0;
+  if (jokers && size(countsDict) !== 1) {
+    jokersCount = countsDict["J"];
+    delete countsDict["J"];
+  }
+
+  const counts = reverse(Object.values(countsDict).sort());
+  counts[0] += jokersCount;
 
   if (counts[0] === 5) {
     return "FIVE_KIND";
@@ -60,12 +67,11 @@ function getType(hand: Hand): HandType {
       return "ONE_PAIR";
     }
   } else {
-    assert(counts.length === 5);
     return "HIGH_CARD";
   }
 }
 
-async function loadInput(): Promise<Game[]> {
+async function loadInput(jokers: boolean): Promise<Game[]> {
   const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
@@ -77,53 +83,59 @@ async function loadInput(): Promise<Game[]> {
       const [handRaw, betRaw] = line.split(" ");
 
       const hand = Array.from(handRaw) as Hand;
-      const type = getType(hand);
+      const type = getType(hand, jokers);
       const bet = parseInt(betRaw);
 
       return { hand, type, bet };
     });
 }
 
-function gameComparator(a: Game, b: Game): number {
-  if (a.type !== b.type) {
-    const aTypeIdx = handTypes.indexOf(a.type);
-    const bTypeIdx = handTypes.indexOf(b.type);
+function getComparator() {
+  return (a: Game, b: Game): number => {
+    if (a.type !== b.type) {
+      const aTypeIdx = handTypes.indexOf(a.type);
+      const bTypeIdx = handTypes.indexOf(b.type);
 
-    return bTypeIdx - aTypeIdx;
-  }
-
-  for (let i = 0; i < 5; i++) {
-    const aVal = a.hand[i];
-    const bVal = b.hand[i];
-
-    if (aVal !== bVal) {
-      const aValIdx = cardValues.indexOf(aVal);
-      const bValIdx = cardValues.indexOf(bVal);
-
-      return bValIdx - aValIdx;
+      return bTypeIdx - aTypeIdx;
     }
-  }
 
-  return 0;
+    for (let i = 0; i < 5; i++) {
+      const aVal = a.hand[i];
+      const bVal = b.hand[i];
+
+      if (aVal !== bVal) {
+        const aValIdx = cardValues.indexOf(aVal);
+        const bValIdx = cardValues.indexOf(bVal);
+
+        return bValIdx - aValIdx;
+      }
+    }
+
+    return 0;
+  };
+}
+
+function getWinnings(games: Game[]): number {
+  const orderedGames = games.sort(getComparator());
+
+  return sum(orderedGames.map((game, idx) => (idx + 1) * game.bet));
 }
 
 async function part1() {
-  const input = await loadInput();
+  const input = await loadInput(false);
 
-  const orderedGames = input.sort(gameComparator);
-
-  const result = sum(orderedGames.map((game, idx) => (idx + 1) * game.bet));
+  const result = getWinnings(input);
 
   console.log("part1", result);
 }
 
 async function part2() {
-  const input = await loadInput();
+  const input = await loadInput(true);
 
-  const result = input;
+  const result = getWinnings(input);
 
   console.log("part2", result);
 }
 
 part1();
-// part2();
+part2();
