@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { countBy, identity, reverse, size, sortBy, sum } from "lodash";
+import { countBy, identity, reverse, size, sum } from "lodash";
 import { join } from "path";
 
 const cardValues = [
@@ -90,33 +90,31 @@ async function loadInput(jokers: boolean): Promise<Game[]> {
     });
 }
 
-function getComparator() {
-  return (a: Game, b: Game): number => {
-    if (a.type !== b.type) {
-      const aTypeIdx = handTypes.indexOf(a.type);
-      const bTypeIdx = handTypes.indexOf(b.type);
+function gameComparator(a: Game, b: Game): number {
+  if (a.type !== b.type) {
+    const aTypeIdx = handTypes.indexOf(a.type);
+    const bTypeIdx = handTypes.indexOf(b.type);
 
-      return bTypeIdx - aTypeIdx;
+    return bTypeIdx - aTypeIdx;
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const aVal = a.hand[i];
+    const bVal = b.hand[i];
+
+    if (aVal !== bVal) {
+      const aValIdx = cardValues.indexOf(aVal);
+      const bValIdx = cardValues.indexOf(bVal);
+
+      return bValIdx - aValIdx;
     }
+  }
 
-    for (let i = 0; i < 5; i++) {
-      const aVal = a.hand[i];
-      const bVal = b.hand[i];
-
-      if (aVal !== bVal) {
-        const aValIdx = cardValues.indexOf(aVal);
-        const bValIdx = cardValues.indexOf(bVal);
-
-        return bValIdx - aValIdx;
-      }
-    }
-
-    return 0;
-  };
+  return 0;
 }
 
 function getWinnings(games: Game[]): number {
-  const orderedGames = games.sort(getComparator());
+  const orderedGames = games.sort(gameComparator);
 
   return sum(orderedGames.map((game, idx) => (idx + 1) * game.bet));
 }
@@ -125,7 +123,6 @@ async function part1() {
   const input = await loadInput(false);
 
   const result = getWinnings(input);
-
   console.log("part1", result);
 }
 
@@ -133,9 +130,12 @@ async function part2() {
   const input = await loadInput(true);
 
   const result = getWinnings(input);
-
   console.log("part2", result);
 }
 
-part1();
-part2();
+async function main() {
+  await part1();
+  await part2();
+}
+
+main();
