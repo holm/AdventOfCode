@@ -42,7 +42,7 @@ function getType(hand: Hand, jokers: boolean): HandType {
   const countsDict = countBy(hand);
 
   let jokersCount = 0;
-  if (jokers && size(countsDict) !== 1) {
+  if (jokers && "J" in countsDict && size(countsDict) !== 1) {
     jokersCount = countsDict["J"];
     delete countsDict["J"];
   }
@@ -90,31 +90,35 @@ async function loadInput(jokers: boolean): Promise<Game[]> {
     });
 }
 
-function gameComparator(a: Game, b: Game): number {
-  if (a.type !== b.type) {
-    const aTypeIdx = handTypes.indexOf(a.type);
-    const bTypeIdx = handTypes.indexOf(b.type);
+function getComparator(jokers: boolean) {
+  return (a: Game, b: Game): number => {
+    if (a.type !== b.type) {
+      const aTypeIdx = handTypes.indexOf(a.type);
+      const bTypeIdx = handTypes.indexOf(b.type);
 
-    return bTypeIdx - aTypeIdx;
-  }
-
-  for (let i = 0; i < 5; i++) {
-    const aVal = a.hand[i];
-    const bVal = b.hand[i];
-
-    if (aVal !== bVal) {
-      const aValIdx = cardValues.indexOf(aVal);
-      const bValIdx = cardValues.indexOf(bVal);
-
-      return bValIdx - aValIdx;
+      return bTypeIdx - aTypeIdx;
     }
-  }
 
-  return 0;
+    for (let i = 0; i < 5; i++) {
+      const aVal = a.hand[i];
+      const bVal = b.hand[i];
+
+      if (aVal !== bVal) {
+        const aValIdx =
+          jokers && aVal === "J" ? cardValues.length : cardValues.indexOf(aVal);
+        const bValIdx =
+          jokers && bVal === "J" ? cardValues.length : cardValues.indexOf(bVal);
+
+        return bValIdx - aValIdx;
+      }
+    }
+
+    return 0;
+  };
 }
 
-function getWinnings(games: Game[]): number {
-  const orderedGames = games.sort(gameComparator);
+function getWinnings(games: Game[], jokers: boolean): number {
+  const orderedGames = games.sort(getComparator(jokers));
 
   return sum(orderedGames.map((game, idx) => (idx + 1) * game.bet));
 }
@@ -122,14 +126,14 @@ function getWinnings(games: Game[]): number {
 async function part1() {
   const input = await loadInput(false);
 
-  const result = getWinnings(input);
+  const result = getWinnings(input, false);
   console.log("part1", result);
 }
 
 async function part2() {
   const input = await loadInput(true);
 
-  const result = getWinnings(input);
+  const result = getWinnings(input, true);
   console.log("part2", result);
 }
 
