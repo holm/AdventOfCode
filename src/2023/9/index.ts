@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { identity, reverse, sum } from "lodash";
+import { identity, reverse, sumBy } from "lodash";
 import { join } from "path";
 
 type Sequence = number[];
@@ -38,15 +38,17 @@ function getDifferencesStack(sequence: Sequence): Sequence[] {
   return stack;
 }
 
-function predict(sequence: Sequence): number {
+function predict(sequence: Sequence): [number, number] {
   const stack = getDifferencesStack(sequence);
 
-  let prediction = 0;
+  let forward = 0;
+  let backward = 0;
   for (const entry of reverse(stack)) {
-    prediction = entry[entry.length - 1] + prediction;
+    forward = entry[entry.length - 1] + forward;
+    backward = entry[0] - backward;
   }
 
-  return prediction;
+  return [forward, backward];
 }
 
 async function part1() {
@@ -54,20 +56,22 @@ async function part1() {
 
   const predictions = sequences.map((sequence) => predict(sequence));
 
-  const result = sum(predictions);
+  const result = sumBy(predictions, ([forward, backward]) => forward);
   console.log("part1", result);
 }
 
 async function part2() {
   const sequences = await loadInput();
 
-  const result = sequences;
+  const predictions = sequences.map((sequence) => predict(sequence));
+
+  const result = sumBy(predictions, ([forward, backward]) => backward);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
