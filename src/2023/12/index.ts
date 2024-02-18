@@ -1,11 +1,12 @@
 import fs from "fs/promises";
-import { identity, sortBy, sum, times } from "lodash";
+import { identity, sumBy, times } from "lodash";
 import { join } from "path";
 import memoize from "fast-memoize";
 
+type Indicator = "." | "?" | "#";
+
 type Row = {
-  broken: number[];
-  unknown: number[];
+  indicators: Indicator[];
   groups: number[];
 };
 
@@ -14,7 +15,7 @@ function repeatString(str: string, separator: string, count: number): string {
 }
 
 async function loadInput(repeat = 1): Promise<Row[]> {
-  const data = await fs.readFile(join(__dirname, "example.txt"), {
+  const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
 
@@ -24,95 +25,63 @@ async function loadInput(repeat = 1): Promise<Row[]> {
     .map((line) => {
       const [indicatorsRaw, groupsRaw] = line.split(" ");
 
-      const broken: number[] = [];
-      const unknown: number[] = [];
-      for (const [idx, indicator] of repeatString(indicatorsRaw, "?", repeat)
-        .split("")
-        .entries()) {
-        if (indicator === "#") {
-          broken.push(idx);
-        } else if (indicator === "?") {
-          unknown.push(idx);
-        }
-      }
-
+      const indicators = repeatString(indicatorsRaw, "?", repeat).split(
+        ""
+      ) as Indicator[];
       const groups = repeatString(groupsRaw, ",", repeat)
         .split(",")
         .map((groupRaw) => parseInt(groupRaw));
 
       return {
-        broken,
-        unknown,
+        indicators,
         groups,
       };
     });
 }
 
-function* combinations<T>(array: T[], count: number): Generator<T[]> {
-  const keys: number[] = [];
-  for (let i = 0; i < count; i++) {
-    keys.push(-1);
+function permutations(indicators: Indicator[], groups: number[]): number {
+  if (indicators.length === 0) {
+    return groups.length === 0 ? 1 : 0;
   }
 
-  const arrayLength = array.length;
-
-  let index = 0;
-  while (index >= 0) {
-    if (keys[index] < arrayLength - (count - index)) {
-      for (let key = keys[index] - index + 1; index < count; index++) {
-        keys[index] = key + index;
-      }
-      yield keys.map((c) => array[c]);
-    } else {
-      index--;
+  const indicator = indicators[0];
+  if (indicator === ".") {
+    return permutationsMemoized(indicators.slice(1), groups);
+  } else if (indicator === "#") {
+    if (groups.length === 0) {
+      return 0;
     }
-  }
-}
 
-function groupsSatisfiedRecursive(broken: number[], groups: number[]): boolean {
-  const group = groups[0];
-  if (group > 1 && broken[group - 1] !== broken[0] + group - 1) {
-    return false;
-  }
+    const group = groups[0];
+    for (let i = 1; i < group; i++) {
+      if (indicators[i] === ".") {
+        return 0;
+      }
+    }
 
-  if (broken[group] === broken[0] + group) {
-    return false;
-  }
+    if (indicators[group] === "#") {
+      return 0;
+    }
 
-  if (groups.length > 1) {
-    return groupsSatisfied(broken.slice(group), groups.slice(1));
+    return permutationsMemoized(indicators.slice(group + 1), groups.slice(1));
+  } else if (indicator === "?") {
+    return (
+      permutationsMemoized(["#", ...indicators.slice(1)], groups) +
+      permutationsMemoized([".", ...indicators.slice(1)], groups)
+    );
   } else {
-    return group === broken.length;
+    throw new Error(`Unknown indicator ${indicator}`);
   }
 }
 
-const groupsSatisfied = memoize(groupsSatisfiedRecursive);
+const permutationsMemoized = memoize(permutations);
 
 function computeCombinations(rows: Row[]): number {
-  const rowCombinations = rows.map((row, rowIdx) => {
-    console.log(`${rowIdx}/${rows.length}`);
-
-    const totalBroken = sum(row.groups);
-    const missing = totalBroken - row.broken.length;
-
-    if (missing === 0) {
-      return 1;
-    }
-
-    let valid = 0;
-    for (const possibleBroken of combinations(row.unknown, missing)) {
-      const guessBroken = sortBy([...row.broken, ...possibleBroken]);
-      if (groupsSatisfied(guessBroken, row.groups)) {
-        valid++;
-      }
-    }
-
-    console.log(`Row ${rowIdx} = ${valid}`);
-
-    return valid;
+  return sumBy(rows, (row) => {
+    const count = permutations(row.indicators, row.groups);
+    console.log(`Row = ${count}`);
+    return count;
   });
-
-  return sum(rowCombinations);
 }
 
 async function part1() {
@@ -131,7 +100,7 @@ async function part2() {
 
 async function main() {
   await part1();
-  await part2();
+  // await part2();
 }
 
 main();
