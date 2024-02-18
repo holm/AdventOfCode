@@ -46,13 +46,19 @@ function permutations(indicators: Indicator[], groups: number[]): number {
 
   const indicator = indicators[0];
   if (indicator === ".") {
+    // Operational indicator
     return permutationsMemoized(indicators.slice(1), groups);
   } else if (indicator === "#") {
+    // Damaged indicator
     if (groups.length === 0) {
       return 0;
     }
 
     const group = groups[0];
+    if (indicators.length < group) {
+      return 0;
+    }
+
     for (let i = 1; i < group; i++) {
       if (indicators[i] === ".") {
         return 0;
@@ -64,24 +70,19 @@ function permutations(indicators: Indicator[], groups: number[]): number {
     }
 
     return permutationsMemoized(indicators.slice(group + 1), groups.slice(1));
-  } else if (indicator === "?") {
+  } else {
+    // Unknown indicator
     return (
       permutationsMemoized(["#", ...indicators.slice(1)], groups) +
       permutationsMemoized([".", ...indicators.slice(1)], groups)
     );
-  } else {
-    throw new Error(`Unknown indicator ${indicator}`);
   }
 }
 
 const permutationsMemoized = memoize(permutations);
 
 function computeCombinations(rows: Row[]): number {
-  return sumBy(rows, (row) => {
-    const count = permutations(row.indicators, row.groups);
-    console.log(`Row = ${count}`);
-    return count;
-  });
+  return sumBy(rows, (row) => permutations(row.indicators, row.groups));
 }
 
 async function part1() {
@@ -100,7 +101,7 @@ async function part2() {
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
