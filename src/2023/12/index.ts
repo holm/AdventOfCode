@@ -3,10 +3,9 @@ import { identity, sortBy, sum } from "lodash";
 import { join } from "path";
 import combinations from "combinations";
 
-type Indicator = "?" | "." | "#";
-
 type Row = {
-  indicators: Indicator[];
+  broken: number[];
+  unknown: number[];
   groups: number[];
 };
 
@@ -21,9 +20,22 @@ async function loadInput(): Promise<Row[]> {
     .map((line) => {
       const [indicatorsRaw, groupsRaw] = line.split(" ");
 
+      const broken: number[] = [];
+      const unknown: number[] = [];
+      for (const [idx, indicator] of indicatorsRaw.split("").entries()) {
+        if (indicator === "#") {
+          broken.push(idx);
+        } else if (indicator === "?") {
+          unknown.push(idx);
+        }
+      }
+
+      const groups = groupsRaw.split(",").map((groupRaw) => parseInt(groupRaw));
+
       return {
-        indicators: indicatorsRaw.split("") as Indicator[],
-        groups: groupsRaw.split(",").map((groupRaw) => parseInt(groupRaw)),
+        broken,
+        unknown,
+        groups,
       };
     });
 }
@@ -48,29 +60,17 @@ function areGroupsSatisfied(broken: number[], groups: number[]): boolean {
   return brokenIdx === broken.length;
 }
 
-async function part1() {
-  const rows = await loadInput();
-
+function computeCombinations(rows: Row[]): number {
   const rowCombinations = rows.map((row) => {
-    const knownBroken: number[] = [];
-    const unknown: number[] = [];
-    for (const [idx, indicator] of row.indicators.entries()) {
-      if (indicator === "#") {
-        knownBroken.push(idx);
-      } else if (indicator === "?") {
-        unknown.push(idx);
-      }
-    }
-
     const totalBroken = sum(row.groups);
-    const missing = totalBroken - knownBroken.length;
+    const missing = totalBroken - row.broken.length;
 
     if (missing > 0) {
-      const possibleCombinations = combinations(unknown, missing, missing);
+      const possibleCombinations = combinations(row.unknown, missing, missing);
 
       const validCombinations = possibleCombinations.filter(
         (possibleBroken) => {
-          const guessBroken = sortBy([...knownBroken, ...possibleBroken]);
+          const guessBroken = sortBy([...row.broken, ...possibleBroken]);
 
           return areGroupsSatisfied(guessBroken, row.groups);
         }
@@ -82,7 +82,13 @@ async function part1() {
     }
   });
 
-  const result = sum(rowCombinations);
+  return sum(rowCombinations);
+}
+
+async function part1() {
+  const rows = await loadInput();
+
+  const result = computeCombinations(rows);
   console.log("part1", result);
 }
 
