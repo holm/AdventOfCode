@@ -1,7 +1,8 @@
 import fs from "fs/promises";
-import { identity } from "lodash";
+import { identity, max } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
+import assert from "assert";
 
 type Indicator = "/" | "\\" | "." | "-" | "|";
 type Direction = "N" | "S" | "E" | "W";
@@ -66,19 +67,14 @@ async function loadInput(): Promise<Grid<Indicator>> {
   return grid;
 }
 
-type QueueEntry = {
+type LocationDirection = {
   location: Coordinate;
   direction: Direction;
 };
 
-function energise(layout: Grid<Indicator>): number {
+function energise(layout: Grid<Indicator>, start: LocationDirection): number {
   const energyGrid = new Grid<Direction[]>();
-  const queue: QueueEntry[] = [
-    {
-      location: [-1, 0],
-      direction: "E",
-    },
-  ];
+  const queue: LocationDirection[] = [start];
   let energised = 0;
 
   // eslint-disable-next-line no-constant-condition
@@ -127,20 +123,45 @@ function energise(layout: Grid<Indicator>): number {
 async function part1() {
   const layout = await loadInput();
 
-  const result = energise(layout);
+  const result = energise(layout, {
+    location: [-1, 0],
+    direction: "E",
+  });
   console.log("part1", result);
 }
 
 async function part2() {
   const layout = await loadInput();
 
-  const result = "";
+  const starts: LocationDirection[] = [];
+
+  const xRange = layout.getXRange().asArray();
+  const yRange = layout.getYRange().asArray();
+  assert(xRange && yRange);
+
+  for (const x of xRange) {
+    starts.push({ location: [x, -1], direction: "S" });
+    starts.push({
+      location: [x, yRange[yRange.length - 1] + 1],
+      direction: "N",
+    });
+  }
+
+  for (const y of yRange) {
+    starts.push({ location: [-1, y], direction: "E" });
+    starts.push({
+      location: [xRange[xRange.length - 1] + 1, y],
+      direction: "W",
+    });
+  }
+
+  const result = max(starts.map((start) => energise(layout, start)));
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
