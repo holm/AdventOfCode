@@ -72,14 +72,14 @@ async function part2() {
     }
   }
 
-  const scores = map.map((box, boxIdx) => {
-    return (
-      (boxIdx + 1) *
-      sum(box.map((entry, entryIdx) => (entryIdx + 1) * entry[1]))
-    );
-  });
-
-  const result = sum(scores);
+  const result = sum(
+    map.map((box, boxIdx) => {
+      return (
+        (boxIdx + 1) *
+        sum(box.map((entry, entryIdx) => (entryIdx + 1) * entry[1]))
+      );
+    })
+  );
   console.log("part2", result);
 }
 
