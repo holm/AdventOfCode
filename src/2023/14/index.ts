@@ -81,17 +81,45 @@ async function part1() {
 async function part2() {
   const grid = await loadInput();
 
-  console.log(grid.toString());
-  roll(grid, [0, -1]);
-  console.log(grid.toString());
+  const directions: [number, number][] = [
+    [0, -1],
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+  ];
 
-  const result = grid.toString();
+  const history: string[] = [];
+  let superCycled = false;
+
+  let cyclesLeft = 1000000000;
+  while (cyclesLeft > 0) {
+    for (const direction of directions) {
+      roll(grid, direction);
+    }
+
+    cyclesLeft -= 1;
+
+    if (!superCycled) {
+      const currentSpin = grid.toString();
+      const pastOccurence = history.indexOf(currentSpin);
+      if (pastOccurence !== -1) {
+        const superCycleTime = history.length - pastOccurence;
+
+        cyclesLeft = cyclesLeft % superCycleTime;
+        superCycled = true;
+      } else {
+        history.push(currentSpin);
+      }
+    }
+  }
+
+  const result = calculateLoad(grid);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
