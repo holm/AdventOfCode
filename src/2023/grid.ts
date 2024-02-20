@@ -35,6 +35,10 @@ export class Column<T> {
 
     this.range.update(y);
   }
+
+  has(y: number): boolean {
+    return this.values.has(y);
+  }
 }
 
 export class Grid<T> {
@@ -73,6 +77,14 @@ export class Grid<T> {
     }
 
     return defaultValue;
+  }
+
+  has(x: number, y: number): boolean {
+    const yValuesForX = this.yValues.get(x);
+    if (yValuesForX === undefined) {
+      return false;
+    }
+    return yValuesForX.has(y);
   }
 
   getYRange(x?: number): Range {
