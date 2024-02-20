@@ -151,13 +151,13 @@ async function part1() {
 async function part2() {
   const map = await loadInput();
 
-  const result = map.toString();
+  const result = findPath(map, 4, 10);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
