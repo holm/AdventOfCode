@@ -5,13 +5,18 @@ import { join } from "path";
 
 type Feature = "x" | "m" | "a" | "s";
 type Part = Record<Feature, number>;
-type Condition = "<" | ">";
+type Comparator = "<" | ">";
+type Condition = {
+  feature: Feature;
+  comparator: Comparator;
+  threshold: number;
+};
 type Result = "A" | "R" | string;
+type Range = [number, number];
+type Blueprint = Record<Feature, Range>;
 
 type Rule = {
-  feature: Feature;
   condition: Condition;
-  threshold: number;
   result: Result;
 };
 type Workflow = {
@@ -55,9 +60,11 @@ async function loadInput(): Promise<Input> {
           assert(ruleParts);
 
           return {
-            feature: ruleParts[1] as Feature,
-            condition: ruleParts[2] as Condition,
-            threshold: parseInt(ruleParts[3]),
+            condition: {
+              feature: ruleParts[1] as Feature,
+              comparator: ruleParts[2] as Comparator,
+              threshold: parseInt(ruleParts[3]),
+            },
             result: ruleParts[4],
           } as Rule;
         });
@@ -97,16 +104,133 @@ function isAccepted(part: Part, workflows: Workflows, next: string): boolean {
   assert(workflow);
 
   for (const rule of workflow.rules) {
-    const partValue = part[rule.feature];
+    const partValue = part[rule.condition.feature];
     if (
-      (rule.condition === "<" && partValue < rule.threshold) ||
-      (rule.condition === ">" && partValue > rule.threshold)
+      (rule.condition.comparator === "<" &&
+        partValue < rule.condition.threshold) ||
+      (rule.condition.comparator === ">" &&
+        partValue > rule.condition.threshold)
     ) {
       return isAccepted(part, workflows, rule.result);
     }
   }
 
   return isAccepted(part, workflows, workflow.defaultResult);
+}
+
+function addCondition(
+  blueprint: Blueprint,
+  condition: Condition
+): Blueprint | undefined {
+  const currentRange = blueprint[condition.feature];
+
+  if (condition.comparator === "<") {
+    if (currentRange[0] >= condition.threshold) {
+      return;
+    } else if (currentRange[1] >= condition.threshold) {
+      return {
+        ...blueprint,
+        [condition.feature]: [currentRange[0], condition.threshold - 1],
+      };
+    } else {
+      return blueprint;
+    }
+  } else {
+    if (currentRange[1] <= condition.threshold) {
+      return;
+    } else if (currentRange[0] <= condition.threshold) {
+      return {
+        ...blueprint,
+        [condition.feature]: [condition.threshold + 1, currentRange[1]],
+      };
+    } else {
+      return blueprint;
+    }
+  }
+}
+
+function addConditions(
+  blueprint: Blueprint,
+  conditions: Condition[]
+): Blueprint | undefined {
+  for (const condition of conditions) {
+    const updatedBlueprint = addCondition(blueprint, condition);
+    if (updatedBlueprint === undefined) {
+      return undefined;
+    }
+    blueprint = updatedBlueprint;
+  }
+
+  return blueprint;
+}
+
+function addConditionsToAll(
+  blueprints: Blueprint[],
+  conditions: Condition[]
+): Blueprint[] {
+  const adjustedBlueprints: Blueprint[] = [];
+
+  for (const blueprint of blueprints) {
+    const adjustedBlueprint = addConditions(blueprint, conditions);
+    if (adjustedBlueprint !== undefined) {
+      adjustedBlueprints.push(adjustedBlueprint);
+    }
+  }
+
+  return adjustedBlueprints;
+}
+
+function computeBlueprints(
+  existingBlueprints: Blueprint[],
+  workflows: Workflows,
+  next: string
+): Blueprint[] {
+  if (next === "A") {
+    return existingBlueprints;
+  } else if (next === "R") {
+    return [];
+  }
+
+  const workflow = workflows[next];
+  assert(workflow);
+
+  const finalBlueprints = [] as Blueprint[];
+  const addedConditions = [] as Condition[];
+
+  for (const rule of workflow.rules) {
+    const adjustedBlueprints = addConditionsToAll(existingBlueprints, [
+      ...addedConditions,
+      rule.condition,
+    ]);
+
+    finalBlueprints.push(
+      ...computeBlueprints(adjustedBlueprints, workflows, rule.result)
+    );
+
+    if (rule.condition.comparator === "<") {
+      addedConditions.push({
+        feature: rule.condition.feature,
+        comparator: ">",
+        threshold: rule.condition.threshold - 1,
+      });
+    } else {
+      addedConditions.push({
+        feature: rule.condition.feature,
+        comparator: "<",
+        threshold: rule.condition.threshold + 1,
+      });
+    }
+  }
+
+  const defaultedBlueprints: Blueprint[] = addConditionsToAll(
+    existingBlueprints,
+    addedConditions
+  );
+  finalBlueprints.push(
+    ...computeBlueprints(defaultedBlueprints, workflows, workflow.defaultResult)
+  );
+
+  return finalBlueprints;
 }
 
 async function part1() {
@@ -127,13 +251,32 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const result = input;
+  const range: Range = [1, 4000];
+  const startBlueprint: Blueprint = {
+    x: range,
+    m: range,
+    a: range,
+    s: range,
+  };
+
+  const blueprints = computeBlueprints([startBlueprint], input.workflows, "in");
+
+  const result = sum(
+    blueprints.map((blueprint) => {
+      let value = 1;
+      for (const [a, b] of Object.values(blueprint)) {
+        value = value * (b - a + 1);
+      }
+
+      return value;
+    })
+  );
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
