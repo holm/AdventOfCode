@@ -1,7 +1,6 @@
 import fs from "fs/promises";
-import { identity } from "lodash";
+import { identity, sum } from "lodash";
 import { join } from "path";
-import { Grid } from "../grid";
 import assert from "assert";
 
 type Direction = "R" | "L" | "U" | "D";
@@ -11,7 +10,6 @@ type Dig = {
   color: string;
 };
 type Coordinate = [number, number];
-type GridContent = "#" | "." | "?";
 
 const moves: Record<Direction, Coordinate> = {
   R: [1, 0],
@@ -43,102 +41,81 @@ async function loadInput(): Promise<Dig[]> {
     });
 }
 
-function fillInterior(grid: Grid<GridContent>): number {
-  const xRange = grid.getXRange();
-  const yRange = grid.getYRange();
-  assert(
-    yRange.min !== undefined &&
-      yRange.max !== undefined &&
-      xRange.min !== undefined &&
-      xRange.max !== undefined
-  );
+function calculateInterior(digs: Dig[]): number {
+  const corners = computeCorners(digs);
 
-  for (let x = xRange.min; x <= xRange.max; x++) {
-    for (let y = yRange.min; y <= yRange.max; y++) {
-      const v = grid.get(x, y);
-      if (v !== undefined) {
-        continue;
-      }
+  const interior =
+    sum(
+      corners.map((corner, idx) => {
+        const nextCorner = corners[(idx + 1) % corners.length];
+        return (corner[0] - nextCorner[0]) * (corner[1] + nextCorner[1]);
+      })
+    ) / 2;
 
-      const start: Coordinate = [x, y];
+  const edge = sum(digs.map((dig) => dig.count));
 
-      const fillQueue: Coordinate[] = [start];
-      const filled: Coordinate[] = [];
-      let outside = false;
-      while (fillQueue.length > 0) {
-        const point = fillQueue.shift();
-        assert(point);
-
-        if (
-          point[0] < xRange.min ||
-          point[0] > xRange.max ||
-          point[1] < yRange.min ||
-          point[1] > yRange.max
-        ) {
-          outside = true;
-          continue;
-        }
-
-        const v = grid.get(point[0], point[1]);
-        if (v === undefined) {
-          grid.set(point[0], point[1], "?");
-          filled.push(point);
-
-          for (const move of Object.values(moves)) {
-            fillQueue.push([point[0] + move[0], point[1] + move[1]]);
-          }
-        }
-      }
-
-      for (const point of filled) {
-        grid.set(point[0], point[1], outside ? "." : "#");
-      }
-    }
-  }
-
-  let digged = 0;
-  for (let x = xRange.min; x <= xRange.max; x++) {
-    for (let y = yRange.min; y <= yRange.max; y++) {
-      if (grid.get(x, y) === "#") {
-        digged += 1;
-      }
-    }
-  }
-
-  return digged;
+  return interior + edge / 2 + 1;
 }
 
-async function part1() {
-  const digs = await loadInput();
-
-  const grid = new Grid<GridContent>();
-
+function computeCorners(digs: Dig[]): Coordinate[] {
+  const corners: Coordinate[] = [];
   let location: Coordinate = [0, 0];
 
   for (const dig of digs) {
     const move = moves[dig.direction];
 
-    for (let m = 1; m <= dig.count; m++) {
-      location = [location[0] + move[0], location[1] + move[1]];
+    location = [
+      location[0] + dig.count * move[0],
+      location[1] + dig.count * move[1],
+    ];
 
-      grid.set(location[0], location[1], "#");
-    }
+    corners.push(location);
   }
 
-  const result = fillInterior(grid);
+  assert(location[0] === 0 && location[1] === 0);
+
+  return corners;
+}
+
+const numberToDirection: Record<string, Direction> = {
+  0: "R",
+  1: "D",
+  2: "L",
+  3: "U",
+};
+
+function colorsToDigs(digs: Dig[]): Dig[] {
+  return digs.map((dig) => {
+    const color = dig.color;
+    const count = parseInt("0x" + color.substring(1, 6), 16);
+    const direction = numberToDirection[color.charAt(6)];
+
+    return {
+      direction,
+      count,
+      color,
+    } as Dig;
+  });
+}
+
+async function part1() {
+  const digs = await loadInput();
+
+  const result = calculateInterior(digs);
   console.log("part1", result);
 }
 
 async function part2() {
   const digs = await loadInput();
+  const adjustedDigs = colorsToDigs(digs);
 
-  const result = digs;
+  const result = calculateInterior(adjustedDigs);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
