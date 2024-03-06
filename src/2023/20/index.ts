@@ -131,7 +131,11 @@ async function loadInput(): Promise<Network> {
 
 type PulseCounts = Record<PulseType, number>;
 
-function press(network: Network, counts: PulseCounts): void {
+function press(
+  network: Network,
+  counts: PulseCounts,
+  target?: string
+): boolean {
   const stack = [
     {
       type: "low" as PulseType,
@@ -147,6 +151,10 @@ function press(network: Network, counts: PulseCounts): void {
 
     counts[pulse.type] = counts[pulse.type] + 1;
 
+    if (target && pulse.destination === target && pulse.type === "low") {
+      return true;
+    }
+
     const module = network[pulse.destination];
     if (module === undefined) {
       continue;
@@ -161,6 +169,8 @@ function press(network: Network, counts: PulseCounts): void {
       });
     }
   }
+
+  return false;
 }
 
 async function part1() {
@@ -181,13 +191,28 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const result = input;
+  const counts: PulseCounts = {
+    low: 0,
+    high: 0,
+  };
+  let presses = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    presses += 1;
+
+    const targetReached = press(input, counts, "rx");
+    if (targetReached) {
+      break;
+    }
+  }
+
+  const result = presses;
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
