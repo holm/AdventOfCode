@@ -2,6 +2,7 @@ import assert from "assert";
 import fs from "fs/promises";
 import { identity } from "lodash";
 import { join } from "path";
+import lcm from "compute-lcm";
 
 type PulseType = "high" | "low";
 type IncomingPulse = {
@@ -51,7 +52,7 @@ class FlipFlopModule extends Module {
   }
 }
 
-class ConjunctionModile extends Module {
+class ConjunctionModule extends Module {
   status: Record<string, PulseType> = {};
 
   process(pulse: IncomingPulse): OutgoingPulse[] {
@@ -120,7 +121,7 @@ async function loadInput(): Promise<Network> {
     } else if (line.type === "%") {
       module = new FlipFlopModule(inputs, line.outputs);
     } else {
-      module = new ConjunctionModile(inputs, line.outputs);
+      module = new ConjunctionModule(inputs, line.outputs);
     }
 
     network[line.name] = module;
@@ -191,22 +192,36 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const counts: PulseCounts = {
-    low: 0,
-    high: 0,
-  };
-  let presses = 0;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    presses += 1;
+  const rxInputs = Object.values(input).filter((module) =>
+    module.outputs.includes("rx")
+  );
+  assert(rxInputs.length === 1);
+  const rxInput = rxInputs[0];
+  assert(rxInput instanceof ConjunctionModule);
 
-    const targetReached = press(input, counts, "rx");
-    if (targetReached) {
-      break;
-    }
-  }
+  const components = await Promise.all(
+    rxInput.inputs.map(async (rxTrigger) => {
+      const counts: PulseCounts = {
+        low: 0,
+        high: 0,
+      };
+      const freshInput = await loadInput();
+      let presses = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        presses += 1;
 
-  const result = presses;
+        const targetReached = press(freshInput, counts, rxTrigger);
+        if (targetReached) {
+          break;
+        }
+      }
+
+      return presses;
+    })
+  );
+
+  const result = lcm(components);
   console.log("part2", result);
 }
 
