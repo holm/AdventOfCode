@@ -166,14 +166,6 @@ function gravity(bricks: Brick[]): BrickInfos {
   return infos;
 }
 
-function isRemovable(brickName: string, infos: BrickInfos): boolean {
-  const supporting = infos[brickName].supporting;
-
-  return ![...supporting.values()].some((other) => {
-    return infos[other].supportedBy.size === 1;
-  });
-}
-
 function getChainLength(brick: string, infos: BrickInfos): number {
   const removed = new Set<string>();
 
@@ -200,7 +192,9 @@ async function part1() {
   const input = await loadInput();
 
   const infos = gravity(input);
-  const removable = input.filter((brick) => isRemovable(brick.name, infos));
+  const removable = input.filter(
+    (brick) => getChainLength(brick.name, infos) === 1
+  );
 
   const result = removable.length;
   console.log("part1", result);
