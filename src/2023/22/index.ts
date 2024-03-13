@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { identity, mapValues, times } from "lodash";
+import { identity, mapValues, sortBy, times } from "lodash";
 import { join } from "path";
 import { Grid3D } from "../grid";
 
@@ -84,7 +84,7 @@ async function loadInput(): Promise<Brick[]> {
     encoding: "utf-8",
   });
 
-  return data
+  const bricks = data
     .split("\n")
     .filter(identity)
     .map((line, idx) => {
@@ -103,6 +103,8 @@ async function loadInput(): Promise<Brick[]> {
         return new Brick(name, start, "x", diff.x + 1);
       }
     });
+
+  return sortBy(bricks, (brick) => brick.start.z);
 }
 
 function gravity(bricks: Brick[]): Record<string, Set<string>> {
