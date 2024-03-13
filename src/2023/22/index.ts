@@ -1,7 +1,8 @@
 import fs from "fs/promises";
-import { identity, mapValues, sortBy, times } from "lodash";
+import { identity, mapValues, sortBy, sum, times } from "lodash";
 import { join } from "path";
 import { Grid3D } from "../grid";
+import assert from "assert";
 
 type Axis = "x" | "y" | "z";
 type Coordinate3D = Record<Axis, number>;
@@ -107,11 +108,24 @@ async function loadInput(): Promise<Brick[]> {
   return sortBy(bricks, (brick) => brick.start.z);
 }
 
-function gravity(bricks: Brick[]): Record<string, Set<string>> {
+type BrickInfo = {
+  supporting: Set<string>;
+  supportedBy: Set<string>;
+};
+
+type BrickInfos = Record<string, BrickInfo>;
+
+function gravity(bricks: Brick[]): BrickInfos {
   const grid = new Grid3D<string>();
 
-  const supportingOf: Record<string, Set<string>> = Object.fromEntries(
-    bricks.map((brick) => [brick.name, new Set<string>()])
+  const infos: BrickInfos = Object.fromEntries(
+    bricks.map((brick) => [
+      brick.name,
+      {
+        supporting: new Set<string>(),
+        supportedBy: new Set<string>(),
+      },
+    ])
   );
 
   let fallingBricks = bricks;
@@ -131,7 +145,8 @@ function gravity(bricks: Brick[]): Record<string, Set<string>> {
           const contact = grid.get(tile.x, tile.y, tile.z);
           if (contact !== undefined) {
             landed = true;
-            supportingOf[contact].add(brick.name);
+            infos[brick.name].supportedBy.add(contact);
+            infos[contact].supporting.add(brick.name);
           }
         }
       }
@@ -148,32 +163,44 @@ function gravity(bricks: Brick[]): Record<string, Set<string>> {
     fallingBricks = stillFallingBricks;
   }
 
-  return supportingOf;
+  return infos;
+}
+
+function isRemovable(brickName: string, infos: BrickInfos): boolean {
+  const supporting = infos[brickName].supporting;
+
+  return ![...supporting.values()].some((other) => {
+    return infos[other].supportedBy.size === 1;
+  });
+}
+
+function getChainLength(brick: string, infos: BrickInfos): number {
+  const removed = new Set<string>();
+
+  const stack = [brick];
+
+  while (stack.length > 0) {
+    const current = stack.shift();
+    assert(current);
+    removed.add(current);
+
+    for (const next of infos[current].supporting) {
+      const supportedBy = infos[next].supportedBy;
+
+      if ([...supportedBy.values()].every((other) => removed.has(other))) {
+        stack.push(next);
+      }
+    }
+  }
+
+  return removed.size;
 }
 
 async function part1() {
   const input = await loadInput();
 
-  const supportingOf = gravity(input);
-  const supportedBy: Record<string, string[]> = Object.fromEntries(
-    input.map((brick) => [brick.name, []])
-  );
-  for (const [name, supporting] of Object.entries(supportingOf)) {
-    for (const support of supporting) {
-      supportedBy[support].push(name);
-    }
-  }
-
-  const removable = input.filter((brick) => {
-    const supporting = supportingOf[brick.name];
-
-    return ![...supporting.values()].some((other) => {
-      return (
-        supportedBy[other].length === 1 && supportedBy[other][0] === brick.name
-      );
-    });
-  });
-  console.log(removable.map((b) => b.name));
+  const infos = gravity(input);
+  const removable = input.filter((brick) => isRemovable(brick.name, infos));
 
   const result = removable.length;
   console.log("part1", result);
@@ -182,13 +209,16 @@ async function part1() {
 async function part2() {
   const input = await loadInput();
 
-  const result = input.toString();
+  const infos = gravity(input);
+  const chains = input.map((brick) => getChainLength(brick.name, infos) - 1);
+
+  const result = sum(chains);
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
