@@ -1,39 +1,41 @@
 import fs from "fs/promises";
-import { identity, maxBy } from "lodash";
+import { identity } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
+import Graph from "graphology";
 import assert from "assert";
 
 type Indicator = "#" | "." | "<" | ">" | "^" | "v" | "O";
+type Direction = "N" | "S" | "E" | "W";
 
-const LEFT = {
-  x: -1,
-  y: 0,
-};
-const RIGHT = {
-  x: 1,
-  y: 0,
-};
-const UP = {
-  x: 0,
-  y: -1,
-};
-const DOWN = {
-  x: 0,
-  y: 1,
+const directions: Record<Direction, Coordinate> = {
+  N: {
+    x: 0,
+    y: -1,
+  },
+  S: {
+    x: 0,
+    y: 1,
+  },
+  E: {
+    x: 1,
+    y: 0,
+  },
+  W: {
+    x: -1,
+    y: 0,
+  },
 };
 
-const moves = [LEFT, RIGHT, UP, DOWN];
-
-const forcedMoves: Partial<Record<Indicator, Coordinate>> = {
-  "<": LEFT,
-  ">": RIGHT,
-  "^": UP,
-  v: DOWN,
+const directionOptions: Record<Direction, Direction[]> = {
+  N: ["N", "E", "W"],
+  S: ["S", "E", "W"],
+  E: ["E", "N", "S"],
+  W: ["W", "N", "S"],
 };
 
 async function loadInput(): Promise<Grid<Indicator>> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "example.txt"), {
     encoding: "utf-8",
   });
 
@@ -47,6 +49,84 @@ async function loadInput(): Promise<Grid<Indicator>> {
   }
 
   return grid;
+}
+
+type GraphStack = {
+  coordinate: Coordinate;
+  direction: "N" | "S" | "E" | "W";
+};
+
+function coordinateToName(coordinate: Coordinate): string {
+  return `${coordinate.x},${coordinate.y}`;
+}
+
+function createGraph(grid: Grid<Indicator>, slippery = true): Graph {
+  const graph = new Graph();
+
+  const start = findStart(grid);
+  const stack: GraphStack[] = [
+    {
+      coordinate: start,
+      direction: "S",
+    },
+  ];
+
+  while (stack.length > 0) {
+    const next = stack.shift();
+    assert(next !== undefined);
+
+    console.log("Looking at", next);
+
+    let current = next;
+    let length = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const options = directionOptions[current.direction].map((direction) => {
+        const move = directions[direction];
+        const coordinate = {
+          x: current.coordinate.x + move.x,
+          y: current.coordinate.y + move.y,
+        };
+
+        return {
+          coordinate,
+          direction,
+        };
+      });
+      const validOptions = options.filter((option) => {
+        const i = grid.get(option.coordinate.x, option.coordinate.y);
+
+        return i !== undefined && i !== "#";
+      });
+
+      if (validOptions.length === 1) {
+        current = validOptions[0];
+        length += 1;
+        console.log("continuing on path", length, current);
+      } else {
+        const startNode = coordinateToName(next.coordinate);
+        const endNode = coordinateToName(current.coordinate);
+
+        if (graph.hasUndirectedEdge(startNode, endNode)) {
+          break;
+        }
+
+        console.log(`Adding edge from ${startNode} to ${endNode}`);
+
+        graph.mergeNode(startNode);
+        graph.mergeNode(endNode);
+
+        graph.mergeUndirectedEdge(startNode, endNode, {
+          length,
+        });
+
+        stack.push(...validOptions);
+        break;
+      }
+    }
+  }
+
+  return graph;
 }
 
 type Coordinate = {
@@ -66,77 +146,12 @@ function findStart(grid: Grid<Indicator>): Coordinate {
   return { x, y };
 }
 
-type Candidate = {
-  position: Coordinate;
-  visited: Set<string>;
-  distance: number;
-};
-
 function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
-  const start = findStart(grid);
-  const endY = grid.getYRange().max;
+  const graph = createGraph(grid);
 
-  const stack: Candidate[] = [
-    {
-      position: start,
-      visited: new Set<string>(),
-      distance: 0,
-    },
-  ];
+  console.log(graph.export());
 
-  const solutions: Candidate[] = [];
-
-  while (stack.length > 0) {
-    const candidate = stack.shift();
-    assert(candidate !== undefined);
-    const { position, visited, distance } = candidate;
-
-    const positionStr = `${position.x},${position.y}`;
-    if (visited.has(positionStr)) {
-      // Already visited
-      continue;
-    }
-
-    const i = grid.get(position.x, position.y);
-    if (i === "#" || i === undefined) {
-      // Cannot move to forrest or outside the grid
-      continue;
-    }
-
-    if (endY === position.y) {
-      // Reached end
-      solutions.push(candidate);
-      continue;
-    }
-
-    let possibleMoves: Coordinate[];
-
-    if (slippery && i in forcedMoves) {
-      possibleMoves = [forcedMoves[i] as Coordinate];
-    } else {
-      possibleMoves = moves;
-    }
-
-    const newVisisted = new Set([...visited, positionStr]);
-
-    for (const move of possibleMoves) {
-      const newPosition = {
-        x: position.x + move.x,
-        y: position.y + move.y,
-      };
-
-      stack.push({
-        position: newPosition,
-        visited: newVisisted,
-        distance: distance + 1,
-      });
-    }
-  }
-
-  const longest = maxBy(solutions, (solution) => solution.distance);
-  assert(longest !== undefined);
-
-  return longest.distance;
+  return 0;
 }
 
 async function part1() {
@@ -157,7 +172,7 @@ async function part2() {
 
 async function main() {
   await part1();
-  await part2();
+  // await part2();
 }
 
 main();
