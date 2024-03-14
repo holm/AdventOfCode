@@ -1,10 +1,10 @@
 import fs from "fs/promises";
-import { identity, max } from "lodash";
+import { identity, maxBy } from "lodash";
 import { join } from "path";
 import { Grid } from "../grid";
 import assert from "assert";
 
-type Indicator = "#" | "." | "<" | ">" | "^" | "v";
+type Indicator = "#" | "." | "<" | ">" | "^" | "v" | "O";
 
 const LEFT = {
   x: -1,
@@ -72,7 +72,7 @@ type Candidate = {
   distance: number;
 };
 
-function findLongestPath(grid: Grid<Indicator>): number {
+function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
   const start = findStart(grid);
   const endY = grid.getYRange().max;
 
@@ -84,7 +84,7 @@ function findLongestPath(grid: Grid<Indicator>): number {
     },
   ];
 
-  const solutions: number[] = [];
+  const solutions: Candidate[] = [];
 
   while (stack.length > 0) {
     const candidate = stack.shift();
@@ -97,23 +97,22 @@ function findLongestPath(grid: Grid<Indicator>): number {
       continue;
     }
 
-    if (endY === position.y) {
-      // Reached end
-      solutions.push(distance);
-      continue;
-    }
-
     const i = grid.get(position.x, position.y);
     if (i === "#" || i === undefined) {
       // Cannot move to forrest or outside the grid
       continue;
     }
 
+    if (endY === position.y) {
+      // Reached end
+      solutions.push(candidate);
+      continue;
+    }
+
     let possibleMoves: Coordinate[];
 
-    const forced = forcedMoves[i];
-    if (forced !== undefined) {
-      possibleMoves = [forced];
+    if (slippery && i in forcedMoves) {
+      possibleMoves = [forcedMoves[i] as Coordinate];
     } else {
       possibleMoves = moves;
     }
@@ -134,29 +133,31 @@ function findLongestPath(grid: Grid<Indicator>): number {
     }
   }
 
-  assert(solutions.length > 0);
+  const longest = maxBy(solutions, (solution) => solution.distance);
+  assert(longest !== undefined);
 
-  return max(solutions) as number;
+  return longest.distance;
 }
 
 async function part1() {
   const grid = await loadInput();
 
-  const result = findLongestPath(grid);
+  const result = findLongestPath(grid, true);
 
   console.log("part1", result);
 }
 
 async function part2() {
-  const input = await loadInput();
+  const grid = await loadInput();
 
-  const result = input;
+  const result = findLongestPath(grid, false);
+
   console.log("part2", result);
 }
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
