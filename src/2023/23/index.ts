@@ -4,38 +4,42 @@ import { join } from "path";
 import { Grid } from "../grid";
 import Graph from "graphology";
 import assert from "assert";
+import { Attributes } from "graphology-types";
 
-type Indicator = "#" | "." | "<" | ">" | "^" | "v" | "O";
-type Direction = "N" | "S" | "E" | "W";
+type Direction = "<" | ">" | "^" | "v";
+type Indicator = "#" | "." | Direction;
+type EdgeAttributes = {
+  distance: number;
+};
 
 const directions: Record<Direction, Coordinate> = {
-  N: {
+  "^": {
     x: 0,
     y: -1,
   },
-  S: {
+  v: {
     x: 0,
     y: 1,
   },
-  E: {
+  ">": {
     x: 1,
     y: 0,
   },
-  W: {
+  "<": {
     x: -1,
     y: 0,
   },
 };
 
 const directionOptions: Record<Direction, Direction[]> = {
-  N: ["N", "E", "W"],
-  S: ["S", "E", "W"],
-  E: ["E", "N", "S"],
-  W: ["W", "N", "S"],
+  "^": ["^", "<", ">"],
+  v: ["v", "<", ">"],
+  "<": ["<", "^", "v"],
+  ">": [">", "^", "v"],
 };
 
 async function loadInput(): Promise<Grid<Indicator>> {
-  const data = await fs.readFile(join(__dirname, "example.txt"), {
+  const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
 
@@ -53,75 +57,114 @@ async function loadInput(): Promise<Grid<Indicator>> {
 
 type GraphStack = {
   coordinate: Coordinate;
-  direction: "N" | "S" | "E" | "W";
+  direction: Direction;
 };
 
 function coordinateToName(coordinate: Coordinate): string {
   return `${coordinate.x},${coordinate.y}`;
 }
 
-function createGraph(grid: Grid<Indicator>, slippery = true): Graph {
-  const graph = new Graph();
+function createGraph(
+  grid: Grid<Indicator>,
+  slippery = true
+): Graph<Attributes, EdgeAttributes> {
+  const graph = new Graph<Attributes, EdgeAttributes>();
 
-  const start = findStart(grid);
+  const [start] = findStartAndEnd(grid);
   const stack: GraphStack[] = [
     {
       coordinate: start,
-      direction: "S",
+      direction: "v",
     },
   ];
+  graph.addNode(coordinateToName(start));
 
   while (stack.length > 0) {
-    const next = stack.shift();
-    assert(next !== undefined);
+    const edgeStart = stack.shift();
+    assert(edgeStart !== undefined);
 
-    console.log("Looking at", next);
-
-    let current = next;
-    let length = 1;
+    let previousPosition = edgeStart.coordinate;
+    let previousDirection = edgeStart.direction;
+    let unidirectional = true;
+    let length = 0;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const options = directionOptions[current.direction].map((direction) => {
-        const move = directions[direction];
-        const coordinate = {
-          x: current.coordinate.x + move.x,
-          y: current.coordinate.y + move.y,
+      const currentMove = directions[previousDirection];
+      assert(currentMove, `Invalid direction ${previousDirection}`);
+      const currentPosition = {
+        x: previousPosition.x + currentMove.x,
+        y: previousPosition.y + currentMove.y,
+      };
+      length += 1;
+
+      if (slippery) {
+        const i = grid.get(currentPosition.x, currentPosition.y);
+        assert(i !== undefined);
+        if (i in directions) {
+          // is a slope
+          const nextMove = directions[i as Direction];
+          if (
+            nextMove.x === currentMove.x * -1 &&
+            nextMove.y === currentMove.y * -1
+          ) {
+            // Opposite direction, stuck
+            break;
+          }
+
+          previousPosition = currentPosition;
+          previousDirection = i as Direction;
+          unidirectional = false;
+          continue;
+        }
+      }
+
+      const nextDirections = directionOptions[previousDirection];
+      const validNextDirections = nextDirections.filter((nextDirections) => {
+        const nextMove = directions[nextDirections];
+        const nextCoordinate = {
+          x: currentPosition.x + nextMove.x,
+          y: currentPosition.y + nextMove.y,
         };
 
-        return {
-          coordinate,
-          direction,
-        };
-      });
-      const validOptions = options.filter((option) => {
-        const i = grid.get(option.coordinate.x, option.coordinate.y);
+        const i = grid.get(nextCoordinate.x, nextCoordinate.y);
 
         return i !== undefined && i !== "#";
       });
 
-      if (validOptions.length === 1) {
-        current = validOptions[0];
-        length += 1;
-        console.log("continuing on path", length, current);
-      } else {
-        const startNode = coordinateToName(next.coordinate);
-        const endNode = coordinateToName(current.coordinate);
+      if (validNextDirections.length !== 1) {
+        const startNode = coordinateToName(edgeStart.coordinate);
+        const endNode = coordinateToName(currentPosition);
 
-        if (graph.hasUndirectedEdge(startNode, endNode)) {
-          break;
+        if (!graph.hasNode(endNode)) {
+          for (const nextDirection of validNextDirections) {
+            stack.push({
+              coordinate: currentPosition,
+              direction: nextDirection,
+            });
+          }
+          graph.addNode(endNode);
         }
 
-        console.log(`Adding edge from ${startNode} to ${endNode}`);
-
-        graph.mergeNode(startNode);
-        graph.mergeNode(endNode);
-
-        graph.mergeUndirectedEdge(startNode, endNode, {
-          length,
-        });
-
-        stack.push(...validOptions);
+        if (unidirectional) {
+          if (!graph.hasUndirectedEdge(startNode, endNode)) {
+            graph.addUndirectedEdge(startNode, endNode, {
+              distance: length,
+            });
+          }
+        } else {
+          if (
+            !graph.hasUndirectedEdge(startNode, endNode) &&
+            !graph.hasDirectedEdge(startNode, endNode)
+          ) {
+            graph.addDirectedEdge(startNode, endNode, {
+              distance: length,
+            });
+          }
+        }
         break;
+      } else {
+        previousPosition = currentPosition;
+        previousDirection = validNextDirections[0];
       }
     }
   }
@@ -134,24 +177,91 @@ type Coordinate = {
   y: number;
 };
 
-function findStart(grid: Grid<Indicator>): Coordinate {
+function findStartAndEnd(grid: Grid<Indicator>): [Coordinate, Coordinate] {
   const yRange = grid.getYRange();
-  const y = yRange.min;
-  assert(y !== undefined);
 
-  const firstRow = grid.getXRange(y);
-  const x = firstRow.asArray()?.find((x) => grid.get(x, y) === ".");
-  assert(x !== undefined);
+  const startY = yRange.min;
+  assert(startY !== undefined);
+  const startRow = grid.getXRange(startY);
+  const startX = startRow.asArray()?.find((x) => grid.get(x, startY) === ".");
+  assert(startX !== undefined);
+  const start = { x: startX, y: startY };
 
-  return { x, y };
+  const endY = yRange.max;
+  assert(endY !== undefined);
+  const endRow = grid.getXRange(endY);
+  const endX = endRow.asArray()?.find((x) => grid.get(x, endY) === ".");
+  assert(endX !== undefined);
+  const end = { x: endX, y: endY };
+
+  return [start, end];
 }
 
+type Candidate = {
+  position: string;
+  visited: Set<string>;
+  distance: number;
+};
+
 function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
-  const graph = createGraph(grid);
+  const graph = createGraph(grid, slippery);
 
-  console.log(graph.export());
+  const [start, end] = findStartAndEnd(grid);
 
-  return 0;
+  const stack: Candidate[] = [
+    {
+      position: coordinateToName(start),
+      visited: new Set<string>(),
+      distance: 0,
+    },
+  ];
+  const endNode = coordinateToName(end);
+
+  let bestSolution: Candidate | undefined;
+  let candidate: Candidate | undefined;
+  while ((candidate = stack.shift()) !== undefined) {
+    const { position, visited, distance } = candidate;
+
+    const newVisisted = new Set([...visited, position]);
+
+    const neighbors = slippery
+      ? graph.outNeighbors(position)
+      : graph.neighbors(position);
+    for (const newPosition of neighbors) {
+      if (visited.has(newPosition)) {
+        // Already visited, cannot go in loops
+        continue;
+      }
+
+      if (newPosition === endNode) {
+        // Reached end
+        if (
+          bestSolution === undefined ||
+          bestSolution.distance < candidate.distance
+        ) {
+          bestSolution = candidate;
+          console.log("current best", candidate.distance, candidate.visited);
+        }
+        continue;
+      }
+
+      const newDistance =
+        distance + graph.getEdgeAttribute(position, newPosition, "distance");
+
+      stack.push({
+        position: newPosition,
+        visited: newVisisted,
+        distance: newDistance,
+      });
+      if (stack.length % 1000 === 0) {
+        console.log(`Stack: ${stack.length}`);
+      }
+    }
+  }
+
+  assert(bestSolution !== undefined);
+
+  return bestSolution.distance;
 }
 
 async function part1() {
@@ -172,7 +282,7 @@ async function part2() {
 
 async function main() {
   await part1();
-  // await part2();
+  await part2();
 }
 
 main();
