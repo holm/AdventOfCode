@@ -39,7 +39,7 @@ const directionOptions: Record<Direction, Direction[]> = {
 };
 
 async function loadInput(): Promise<Grid<Indicator>> {
-  const data = await fs.readFile(join(__dirname, "example.txt"), {
+  const data = await fs.readFile(join(__dirname, "input.txt"), {
     encoding: "utf-8",
   });
 
@@ -244,7 +244,7 @@ function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
 
       if (newPosition === endNode) {
         // Reached end
-        if (bestSolution.distance < candidate.distance) {
+        if (bestSolution.distance < nextSolution.distance) {
           bestSolution = nextSolution;
           console.log(
             "current best",
@@ -253,7 +253,7 @@ function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
           );
         }
       } else {
-        stack.push(nextSolution);
+        stack.unshift(nextSolution);
       }
     }
 
@@ -263,7 +263,6 @@ function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
   }
 
   assert(bestSolution !== undefined);
-  console.log(bestSolution);
 
   return bestSolution.distance;
 }
