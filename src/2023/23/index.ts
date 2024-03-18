@@ -39,7 +39,7 @@ const directionOptions: Record<Direction, Direction[]> = {
 };
 
 async function loadInput(): Promise<Grid<Indicator>> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "example.txt"), {
     encoding: "utf-8",
   });
 
@@ -107,7 +107,7 @@ function createGraph(
             nextMove.x === currentMove.x * -1 &&
             nextMove.y === currentMove.y * -1
           ) {
-            // Opposite direction, stuck
+            // Opposite direction, dead end
             break;
           }
 
@@ -207,17 +207,18 @@ function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
   const graph = createGraph(grid, slippery);
 
   const [start, end] = findStartAndEnd(grid);
-
-  const stack: Candidate[] = [
-    {
-      position: coordinateToName(start),
-      visited: new Set<string>(),
-      distance: 0,
-    },
-  ];
+  const startNode = coordinateToName(start);
   const endNode = coordinateToName(end);
 
-  let bestSolution: Candidate | undefined;
+  const initial: Candidate = {
+    position: startNode,
+    visited: new Set<string>(),
+    distance: 0,
+  };
+  const stack: Candidate[] = [initial];
+
+  let iterations = 0;
+  let bestSolution = initial;
   let candidate: Candidate | undefined;
   while ((candidate = stack.shift()) !== undefined) {
     const { position, visited, distance } = candidate;
@@ -233,33 +234,36 @@ function findLongestPath(grid: Grid<Indicator>, slippery: boolean): number {
         continue;
       }
 
-      if (newPosition === endNode) {
-        // Reached end
-        if (
-          bestSolution === undefined ||
-          bestSolution.distance < candidate.distance
-        ) {
-          bestSolution = candidate;
-          console.log("current best", candidate.distance, candidate.visited);
-        }
-        continue;
-      }
-
       const newDistance =
         distance + graph.getEdgeAttribute(position, newPosition, "distance");
-
-      stack.push({
+      const nextSolution = {
         position: newPosition,
         visited: newVisisted,
         distance: newDistance,
-      });
-      if (stack.length % 1000 === 0) {
-        console.log(`Stack: ${stack.length}`);
+      };
+
+      if (newPosition === endNode) {
+        // Reached end
+        if (bestSolution.distance < candidate.distance) {
+          bestSolution = nextSolution;
+          console.log(
+            "current best",
+            candidate.distance,
+            "(" + [...candidate.visited].join("; ") + ")"
+          );
+        }
+      } else {
+        stack.push(nextSolution);
       }
+    }
+
+    if (++iterations % 10000 === 0) {
+      console.log(`Iterations: ${iterations} (Stack: ${stack.length})`);
     }
   }
 
   assert(bestSolution !== undefined);
+  console.log(bestSolution);
 
   return bestSolution.distance;
 }
