@@ -45,77 +45,116 @@ async function loadInput(): Promise<Input> {
   return { grid, guard };
 }
 
+function walk(grid: Grid, guard: Guard): Guard | null {
+  let [r, c] = guard.position;
+  let newDirection = guard.direction;
+  switch (guard.direction) {
+    case "^":
+      r -= 1;
+      newDirection = ">";
+      break;
+    case "<":
+      c -= 1;
+      newDirection = "^";
+      break;
+    case ">":
+      c += 1;
+      newDirection = "v";
+      break;
+    case "v":
+      r += 1;
+      newDirection = "<";
+      break;
+  }
+
+  if (r < 0 || r >= grid.length || c < 0 || c >= grid[0].length) {
+    // Left the area
+    return null;
+  } else if (grid[r][c] === "#") {
+    // Hit an obstacle
+    return {
+      position: guard.position,
+      direction: newDirection,
+    };
+  } else {
+    // Just moved forward
+    return {
+      position: [r, c],
+      direction: guard.direction,
+    };
+  }
+}
+
+function isLooping(grid: Grid, guard: Guard): boolean {
+  const visisted = new Set<string>();
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const key = `${guard.position[0]}:${guard.position[1]}:${guard.direction}`;
+    if (visisted.has(key)) {
+      return true;
+    }
+    visisted.add(key);
+
+    const newGuard = walk(grid, guard);
+    if (newGuard === null) {
+      return false;
+    }
+    guard = newGuard;
+  }
+}
+
 async function part1(): Promise<number> {
-  // eslint-disable-next-line prefer-const
-  let { grid, guard } = await loadInput();
+  const { grid, guard: startGuard } = await loadInput();
 
   const visisted = new Set<string>();
+  let guard = startGuard;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     visisted.add(`${guard.position[0]}:${guard.position[1]}`);
 
-    let [r, c] = guard.position;
-    switch (guard.direction) {
-      case "^":
-        r -= 1;
-        break;
-      case "<":
-        c -= 1;
-        break;
-      case ">":
-        c += 1;
-        break;
-      case "v":
-        r += 1;
-        break;
-    }
-
-    if (r < 0 || r >= grid.length || c < 0 || c >= grid[0].length) {
-      // Left the area
+    const futureGuard = walk(grid, guard);
+    if (futureGuard === null) {
       break;
-    } else if (grid[r][c] === "#") {
-      // Hit an obstacle
-      let newDirection = guard.direction;
-      switch (guard.direction) {
-        case "^":
-          newDirection = ">";
-          break;
-        case "<":
-          newDirection = "^";
-          break;
-        case ">":
-          newDirection = "v";
-          break;
-        case "v":
-          newDirection = "<";
-          break;
-      }
-
-      guard = {
-        position: guard.position,
-        direction: newDirection,
-      };
-    } else {
-      // Just moved forward
-      guard = {
-        position: [r, c],
-        direction: guard.direction,
-      };
     }
+    guard = futureGuard;
   }
 
   return visisted.size;
 }
 
 async function part2(): Promise<number> {
-  const input = await loadInput();
+  const { grid, guard: startGuard } = await loadInput();
 
-  return 0;
+  const loopingBlocks = new Set<string>();
+
+  let guard = startGuard;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const futureGuard = walk(grid, guard);
+    if (futureGuard === null) {
+      break;
+    }
+
+    // Can't put a block just in front of where the guard started
+    if (guard !== startGuard) {
+      // Put block where the guard would have walked
+      const gridWithBlock = grid.map((row) => [...row]);
+      gridWithBlock[futureGuard.position[0]][futureGuard.position[1]] = "#";
+      if (isLooping(gridWithBlock, startGuard)) {
+        const key = `${futureGuard.position[0]}:${futureGuard.position[1]}`;
+        loopingBlocks.add(key);
+      }
+    }
+
+    guard = futureGuard;
+  }
+
+  return loopingBlocks.size;
 }
 
 async function main() {
   console.log(await part1());
-  // console.log(await part2());
+  console.log(await part2());
 }
 
 main();
