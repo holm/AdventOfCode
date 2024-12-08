@@ -3,7 +3,7 @@ import { identity } from "lodash";
 import { join } from "path";
 
 async function loadInput(): Promise<string[]> {
-  const data = await fs.readFile(join(__dirname, "input.txt"), {
+  const data = await fs.readFile(join(__dirname, "example.txt"), {
     encoding: "utf-8",
   });
 
@@ -24,7 +24,7 @@ async function part2(): Promise<number> {
 
 async function main() {
   console.log(await part1());
-  console.log(await part2());
+  // console.log(await part2());
 }
 
 main();
