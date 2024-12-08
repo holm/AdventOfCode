@@ -86,14 +86,44 @@ async function part1(): Promise<number> {
 }
 
 async function part2(): Promise<number> {
-  const input = await loadInput();
+  const { grid, frequencies } = await loadInput();
 
-  return 0;
+  const antinodes = new Set<string>();
+
+  for (const frequency of frequencies) {
+    const pairs = locationPairs(frequency.locations);
+    for (const [location1, location2] of pairs) {
+      const step = [location1[0] - location2[0], location1[1] - location2[1]];
+
+      let location = location1;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        antinodes.add(`${location[0]},${location[1]}`);
+
+        const antinode: Location = [
+          location[0] + step[0],
+          location[1] + step[1],
+        ];
+        if (
+          antinode[0] < 0 ||
+          antinode[0] >= grid.length ||
+          antinode[1] < 0 ||
+          antinode[1] >= grid[0].length
+        ) {
+          break;
+        }
+
+        location = antinode;
+      }
+    }
+  }
+
+  return antinodes.size;
 }
 
 async function main() {
   console.log(await part1());
-  // console.log(await part2());
+  console.log(await part2());
 }
 
 main();
